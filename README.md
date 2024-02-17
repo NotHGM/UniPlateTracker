@@ -10,6 +10,17 @@ The UniPlateTracker is a web application for monitoring and displaying informati
 - Filters and search functionality.
 - Automated updates for new data.
 
+## Screenshots
+
+Below are some example screenshots of the Number Plate Dashboard. Please note that the plates, dates, and details shown in these images are purely examples and do not represent real plate information or times.
+
+![Screenshot 1](https://github.com/NotHGM/UniPlateTracker/blob/main/Dark%20Mode%20-%20Example.png?raw=true)
+*This is the dashboard in dark mode.*
+
+![Screenshot 2](https://github.com/NotHGM/UniPlateTracker/blob/main/Light%20Mode%20-%20Example.png?raw=true)
+*This is the dashboard in light mode.*
+
+
 ## Installation
 ### Setting up the Database
 Run the provided Python script (`create_db.py`) to set up the necessary tables in your PostgreSQL database.
@@ -25,7 +36,7 @@ Run the provided Python script (`create_db.py`) to set up the necessary tables i
 ### Setting Up
 1. Clone the repository:
 ```
-git clone https://github.com/NotHGM/UniPlateTracker/
+git clone https://github.com/NotHGM/UniPlateTracker.git
 ```
 
 3. Navigate to the project directory:
