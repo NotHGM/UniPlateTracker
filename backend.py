@@ -70,7 +70,7 @@ def view_data():
         return jsonify(data)
 
     except Exception as e:
-        logging.error(f"Error in view_data endpoint: {str(e)}")
+        logging.error(f"Error in view_data endpoint: {e}")
         return jsonify({'error': 'An error occurred fetching data'}), 500
 
     finally:
@@ -105,7 +105,7 @@ def plate_counts():
 
     except Exception as e:
         logging.error(f"Error in plate_counts endpoint: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'An error occurred counting plates'}), 500
 
     finally:
         cursor.close()
