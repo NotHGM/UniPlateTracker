@@ -68,11 +68,19 @@ python backend.py
 ```
 python background_tasks.py
 ```
+## Hosting the Front-end
 
-3. Host the front-end using an HTTP server. For development, you can use Python's built-in HTTP server:
+To host the front-end of the application, you will need to use an HTTP server. For development purposes, Python's built-in HTTP server can be quite handy. Follow these steps:
+
+1. Navigate to the `html` directory where your front-end files are located:
+```
+cd UniPlateTracker/html
+```
+2. Run Python's built-in HTTP server:
 ```
 python -m http.server
 ```
+This will serve your front-end files on a local web server.
 
 ## Configuration
 Update the `.env` file or set environment variables:
