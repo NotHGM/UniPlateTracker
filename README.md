@@ -14,10 +14,10 @@ The UniPlateTracker is a web application for monitoring and displaying informati
 
 Below are some example screenshots of the Number Plate Dashboard. Please note that the plates, dates, and details shown in these images are purely examples and do not represent real plate information or times.
 
-![Screenshot 1](https://github.com/NotHGM/UniPlateTracker/blob/main/Dark%20Mode%20-%20Example.png?raw=true)
+![Screenshot 1](https://github.com/NotHGM/UniPlateTracker/blob/main/screenshots/Dark%20Mode%20-%20Example.png?raw=true)
 *This is the dashboard in dark mode.*
 
-![Screenshot 2](https://github.com/NotHGM/UniPlateTracker/blob/main/Light%20Mode%20-%20Example.png?raw=true)
+![Screenshot 2](https://github.com/NotHGM/UniPlateTracker/blob/main/screenshots/Light%20Mode%20-%20Example.png?raw=true)
 *This is the dashboard in light mode.*
 
 
