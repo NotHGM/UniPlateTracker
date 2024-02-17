@@ -53,7 +53,7 @@ cd UniPlateTracker
 pip install -r requirements.txt
 ```
 
-5. Configure the database connection and other environment variables as needed.
+5. Configure the database connection and other environment variables as needed. See the [Configuration guide](#configuration) for more details.
 
 ### Running the Application
 > [!NOTE]
