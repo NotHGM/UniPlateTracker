@@ -53,9 +53,15 @@ tr:nth-child(even) {
     align-items: center;
 }
 
+@font-face {
+    font-family: 'Charles Wright';
+    src: url('fonts/CharlesWright.otf') format('opentype');
+}
+
 .license-plate {
     background-color: #ffdd00;
     color: black;
+    font-family: 'Charles Wright', sans-serif;	    
     font-weight: bold;
     padding: 5px 9px;
     font-size: 18px;
