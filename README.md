@@ -27,11 +27,15 @@ Run the provided Python script (`create_db.py`) to set up the necessary tables i
 
 ### Prerequisites
 - Python 3.x
-- Pip (Python package manager)
+- pip (Python package manager)
 - PostgreSQL database
 - A Unifi Protect Camera with AI license plate detection. [Learn more about Unifi Protect](https://unifi-protect.ui.com/).
 - Home Assistant setup for integrating smart home devices. [Home Assistant Official Site](https://www.home-assistant.io/).
 - HTTP server (for hosting the web interface)
+
+> [!NOTE]
+> This project was tested on Debian 12 Linux using Python version 3.11.2 and pip version 23.0.1, as well as on Windows 11 using Python Version 3.12.1 and pip version 23.2.1. It's important to ensure compatibility if using different environments or versions.
+
 
 ### Setting Up
 1. Clone the repository:
