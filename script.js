@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function fetchData() {
-    fetch('YOUR_SERVER_URL/view_data')
+    fetch('YOUR_SERVER_URL:5000/view_data')
         .then(response => response.json())
         .then(data => {
             if (data && data.length > 0) {
@@ -24,7 +24,7 @@ let lastUpdateTime = null;
 
 function pollForUpdates() {
     setInterval(() => {
-        fetch('YOUR_SERVER_URL/last_update_time')
+        fetch('YOUR_SERVER_URL:5000/last_update_time')
             .then(response => response.json())
             .then(data => {
                 if (data.last_update_time && data.last_update_time !== lastUpdateTime) {
@@ -60,7 +60,7 @@ function populateTable(data) {
 }
 
 function fetchFilterData() {
-    fetch('YOUR_SERVER_URL/filter_data')
+    fetch('YOUR_SERVER_URL:5000/filter_data')
     .then(response => response.json())
     .then(data => {
         populateFilterOptions('carMakeFilter', data.car_makes, 'Car Make');
@@ -162,7 +162,7 @@ function applySavedDarkModeState() {
 }
 
 function fetchAndDisplayCounts() {
-    fetch('YOUR_SERVER_URL/plate_counts')
+    fetch('YOUR_SERVER_URL:5000/plate_counts')
         .then(response => response.json())
         .then(data => {
             document.getElementById('count24h').textContent = data.count_24h || '0';
