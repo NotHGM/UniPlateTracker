@@ -156,7 +156,8 @@ def filter_data():
         return jsonify({'car_makes': car_makes, 'car_colors': car_colors, 'years': years, 'fuel_types': fuel_types})
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logging.error(f"Error in filter_data endpoint: {e}")
+        return jsonify({'error': 'An error occurred fetching filter data'}), 500
 
     finally:
         cursor.close()
