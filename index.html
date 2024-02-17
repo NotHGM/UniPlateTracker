@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Number Plate Dashboard</title>
+        <link rel="stylesheet" href="style.css">
+		 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    </head>
+    <body>
+        <header>
+            <div class="header-content">
+                <h1>Number Plate Dashboard</h1>
+                <div class="toggle-switch-container">
+                    <label class="switch">
+                        <input type="checkbox" id="darkModeToggle">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+            </div>
+            <div class="plate-counts-container" id="plateCounts">
+                <div class="plate-count">
+                    <span class="count-title">Last 24 hours:</span>
+                    <span class="count-value" id="count24h">0</span>
+                </div>
+                <div class="plate-count">
+                    <span class="count-title">Last 48 hours:</span>
+                    <span class="count-value" id="count48h">0</span>
+                </div>
+                <div class="plate-count">
+                    <span class="count-title">Last 7 days:</span>
+                    <span class="count-value" id="count7d">0</span>
+                </div>
+                <div class="plate-count">
+                    <span class="count-title">Last 31 days:</span>
+                    <span class="count-value" id="count31d">0</span>
+                </div>
+            </div>
+        </header>
+        <div class="container">
+            <div class="filters">
+                <input type="text" id="searchBar" placeholder="Search Number Plates" onkeyup="searchLicensePlates()">
+                <select id="carMakeFilter" onchange="filterData()">
+                    <option value="">Car Make</option>
+                </select>
+                <select id="carColorFilter" onchange="filterData()">
+                    <option value="">Car Color</option>
+                </select>
+                <select id="yearOfManufactureFilter" onchange="filterData()">
+                    <option value="">Year of Manufacture</option>
+                </select>
+                <select id="fuelTypeFilter" onchange="applyFilters()">
+                    <option value="">Fuel Type</option>
+                </select>                
+                <select id="taxStatusFilter" onchange="applyFilters()">
+                    <option value="">Tax Status</option>
+                    <option value="Taxed">Taxed</option>
+                    <option value="Untaxed">Untaxed</option>
+                    <option value="SORN">SORN</option>
+                    <option value="Not Taxed for on Road Use">Not Taxed for on Road Use</option>
+                </select>
+                <select id="motStatusFilter" onchange="applyFilters()">
+                    <option value="">MOT Status</option>
+                    <option value="Valid">Valid</option>
+                    <option value="Not valid">Not valid</option>
+                    <option value="No results returned">No results returned</option>
+                </select>
+                
+            </div>
+            <table id="data-table">
+                <thead>
+                    <tr>
+                        <th>Number Plate</th>
+                        <th>First Capture Time</th>
+                        <th>Recent Capture Time</th>
+                        <th>Image</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+        <script src="script.js"></script>
+    </body>
+<footer>
+    <div class="footer-content">
+        <span>Made by HGM <span class="heart">❤️</span></span>
+        <div class="social-links">
+            <a href="https://twitter.com/@HGMPlays" target="_blank">
+                <i class="fab fa-twitter"></i>
+            </a>
+            <a href="https://github.com/NotHGM" target="_blank">
+                <i class="fab fa-github"></i>
+            </a>
+            <a href="mailto:george@hgmartist.net">
+                <i class="fas fa-envelope"></i>
+            </a>
+        </div>
+    </div>
+</footer>	
+</html>

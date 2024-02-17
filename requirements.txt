@@ -1,0 +1,6 @@
+Flask==3.0.2
+Flask-Cors==4.0.0
+psycopg2-binary==2.9.9
+requests==2.31.0
+waitress==3.0.0
+opencv-python==4.9.0.80
