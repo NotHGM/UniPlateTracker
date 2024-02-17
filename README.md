@@ -83,10 +83,18 @@ python -m http.server
 This will serve your front-end files on a local web server.
 
 ## Configuration
-Update the `.env` file or set environment variables:
-- Database connection details
-- Home Assistant API URL and token
-- DVLA API key
+
+To configure the application, you need to update the settings in `backend.py` and `background_tasks.py` files. These files contain the necessary configurations for the application to function correctly.
+
+1. **Database Connection Details**: Set up your database connection details including the host, database name, user, and password.
+
+2. **Home Assistant API URL and Token**: Provide the URL for your Home Assistant API and the Long-Lived Access Token. This is essential for fetching license plate data from your camera.
+
+3. **DVLA API Key**: Enter your DVLA API key. This key is used to fetch vehicle details based on the license plate number.
+
+4. **Camera Sensor Name**: Specify the `states/sensor.CAMERA-SENSOR-NAME` for your UniFi Protect camera. This is used to identify which camera sensor data should be fetched.
+
+Make sure to update these details according to your setup for the application to work properly.
 
 ## Usage
 After starting the backend and frontend, navigate to `http://localhost:8000` (or your configured HTTP server port).
