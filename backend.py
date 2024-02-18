@@ -34,23 +34,36 @@ def view_data():
     conn = get_db_connection()
     cursor = conn.cursor()
 
+    # Retrieve query parameters
+    page = int(request.args.get('page', 1))
+    limit = int(request.args.get('limit', 10))
+    offset = (page - 1) * limit
+    make = request.args.get('make', '')
+    color = request.args.get('color', '')
+    year = request.args.get('year', '')
+    fuelType = request.args.get('fuelType', '')
+    tax = request.args.get('tax', '')
+    mot = request.args.get('mot', '')
+
     try:
-        # SQL query to fetch data with correct recent capture time
-        cursor.execute("""
-        SELECT plate_number, 
-               MIN(capture_time) AS first_capture_time, 
-               MAX(recent_capture_time) AS recent_capture_time, 
-               image_data,
-               car_make, 
-               car_color, 
-               fuel_type, 
-               mot_status, 
-               tax_status, 
+        # Construct query with parameters
+        query = """
+        SELECT plate_number, MIN(capture_time) AS first_capture_time,
+               MAX(recent_capture_time) AS recent_capture_time, image_data,
+               car_make, car_color, fuel_type, mot_status, tax_status,
                year_of_manufacture
-        FROM license_plates 
+        FROM license_plates
+        WHERE (%s = '' OR car_make = %s)
+        AND (%s = '' OR car_color = %s)
+        AND (%s = '' OR year_of_manufacture::text = %s)
+        AND (%s = '' OR fuel_type = %s)
+        AND (%s = '' OR tax_status = %s)
+        AND (%s = '' OR mot_status = %s)
         GROUP BY plate_number, image_data, car_make, car_color, fuel_type, mot_status, tax_status, year_of_manufacture
         ORDER BY recent_capture_time DESC
-        """)
+        LIMIT %s OFFSET %s
+        """
+        cursor.execute(query, (make, make, color, color, year, year, fuelType, fuelType, tax, tax, mot, mot, limit, offset))
         rows = cursor.fetchall()
 
         # Format data for JSON response
@@ -68,7 +81,6 @@ def view_data():
         } for row in rows]
 
         return jsonify(data)
-
     except Exception as e:
         logging.error(f"Error in view_data endpoint: {e}")
         return jsonify({'error': 'An error occurred fetching data'}), 500
@@ -84,28 +96,33 @@ def plate_counts():
 
     try:
         # Count for the last 24 hours
-        cursor.execute("SELECT COUNT(*) as count FROM license_plates WHERE capture_time > NOW() - INTERVAL '24 hours'")
+        cursor.execute("SELECT COUNT(DISTINCT plate_number) as count FROM license_plates WHERE capture_time > NOW() - INTERVAL '24 hours'")
         count_24h = cursor.fetchone()
         count_24h = count_24h['count'] if count_24h else 0
 
         # Count for the last 48 hours
-        cursor.execute("SELECT COUNT(*) as count FROM license_plates WHERE capture_time > NOW() - INTERVAL '48 hours'")
+        cursor.execute("SELECT COUNT(DISTINCT plate_number) as count FROM license_plates WHERE capture_time > NOW() - INTERVAL '48 hours'")
         count_48h = cursor.fetchone()
         count_48h = count_48h['count'] if count_48h else 0
 
         # Count for the last 7 days
-        cursor.execute("SELECT COUNT(*) as count FROM license_plates WHERE capture_time > NOW() - INTERVAL '7 days'")
+        cursor.execute("SELECT COUNT(DISTINCT plate_number) as count FROM license_plates WHERE capture_time > NOW() - INTERVAL '7 days'")
         count_7d = cursor.fetchone()
         count_7d = count_7d['count'] if count_7d else 0
 
         # Count for the last 31 days
-        cursor.execute("SELECT COUNT(*) as count FROM license_plates WHERE capture_time > NOW() - INTERVAL '31 days'")
+        cursor.execute("SELECT COUNT(DISTINCT plate_number) as count FROM license_plates WHERE capture_time > NOW() - INTERVAL '31 days'")
         count_31d = cursor.fetchone()
         count_31d = count_31d['count'] if count_31d else 0
 
+        # Total count of unique plates
+        cursor.execute("SELECT COUNT(DISTINCT plate_number) as total_count FROM license_plates")
+        total_count = cursor.fetchone()
+        total_count = total_count['total_count'] if total_count else 0
+
     except Exception as e:
         logging.error(f"Error in plate_counts endpoint: {e}")
-        return jsonify({'error': 'An error occurred counting plates'}), 500
+        return jsonify({'error': str(e)}), 500
 
     finally:
         cursor.close()
@@ -115,7 +132,8 @@ def plate_counts():
         'count_24h': count_24h,
         'count_48h': count_48h,
         'count_7d': count_7d,
-        'count_31d': count_31d
+        'count_31d': count_31d,
+        'total_count': total_count
     })
 
 @app.route('/last_update_time', methods=['GET'])
@@ -158,7 +176,7 @@ def filter_data():
     except Exception as e:
         logging.error(f"Error in filter_data endpoint: {e}")
         return jsonify({'error': 'An error occurred fetching filter data'}), 500
-
+        
     finally:
         cursor.close()
         conn.close()

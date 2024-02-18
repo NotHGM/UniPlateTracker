@@ -4,18 +4,21 @@
         <meta charset="UTF-8">
         <title>Number Plate Dashboard</title>
         <link rel="stylesheet" href="style.css">
-		 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     </head>
     <body>
         <header>
             <div class="header-content">
                 <h1>Number Plate Dashboard</h1>
-                <div class="toggle-switch-container">
-                    <label class="switch">
-                        <input type="checkbox" id="darkModeToggle">
-                        <span class="slider round"></span>
-                    </label>
-                </div>
+            <div id="darkModeToggleContainer">
+                <label class="switch">
+                    <input type="checkbox" id="darkModeToggle">
+                    <span class="slider round">
+                        <span class="icon sun">&#9728;</span> <!-- Sun icon -->
+                        <span class="icon moon">&#127769;</span> <!-- Moon icon -->
+                    </span>
+                </label>
+            </div>
             </div>
             <div class="plate-counts-container" id="plateCounts">
                 <div class="plate-count">
@@ -33,9 +36,13 @@
                 <div class="plate-count">
                     <span class="count-title">Last 31 days:</span>
                     <span class="count-value" id="count31d">0</span>
-                </div>
-            </div>
-        </header>
+                </div>				
+				<div class="plate-count">
+					<span class="count-title">Total Plates:</span>
+					<span class="count-value" id="totalPlatesCount">0</span>
+				</div>
+			</div>
+        </header>         
         <div class="container">
             <div class="filters">
                 <input type="text" id="searchBar" placeholder="Search Number Plates" onkeyup="searchLicensePlates()">
@@ -63,9 +70,13 @@
                     <option value="Valid">Valid</option>
                     <option value="Not valid">Not valid</option>
                     <option value="No results returned">No results returned</option>
-		    <option value="No details held by DVLA">No details held by DVLA</option>	
+					<option value="No details held by DVLA">No details held by DVLA</option>					
                 </select>
-                
+				<div class="pagination-container" id="pagination">
+					<button class="pagination-button" id="prevPage" onclick="changePage(-1)">Previous</button>
+					<span class="pagination-current-page" id="currentPage">1</span>
+					<button class="pagination-button" id="nextPage" onclick="changePage(1)">Next</button>
+				</div>         
             </div>
             <table id="data-table">
                 <thead>

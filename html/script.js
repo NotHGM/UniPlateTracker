@@ -7,12 +7,25 @@ document.addEventListener('DOMContentLoaded', function() {
     pollForUpdates();
 });
 
+let currentPage = 1;
+let currentFilters = {
+    make: '',
+    color: '',
+    year: '',
+    fuelType: '',
+    tax: '',
+    mot: ''
+};
+
 function fetchData() {
-    fetch('YOUR_SERVER_URL:5000/view_data')
+    const limit = 10;
+    const url = `YOUR-SERVER-URL:5000/view_data?page=${currentPage}&limit=${limit}&make=${currentFilters.make}&color=${currentFilters.color}&year=${currentFilters.year}&fuelType=${currentFilters.fuelType}&tax=${currentFilters.tax}&mot=${currentFilters.mot}`;
+    fetch(url)
         .then(response => response.json())
         .then(data => {
             if (data && data.length > 0) {
                 populateTable(data);
+                updatePageCounter();
             } else {
                 console.error('No data received');
             }
@@ -20,11 +33,21 @@ function fetchData() {
         .catch(error => console.error('Error fetching data:', error));
 }
 
+function changePage(increment) {
+    currentPage += increment;
+    if (currentPage < 1) currentPage = 1;
+    fetchData();
+}
+
+function updatePageCounter() {
+    document.getElementById('currentPage').innerText = currentPage;
+}
+
 let lastUpdateTime = null;
 
 function pollForUpdates() {
     setInterval(() => {
-        fetch('YOUR_SERVER_URL:5000/last_update_time')
+        fetch('YOUR-SERVER-URL:5000/last_update_time')
             .then(response => response.json())
             .then(data => {
                 if (data.last_update_time && data.last_update_time !== lastUpdateTime) {
@@ -60,7 +83,7 @@ function populateTable(data) {
 }
 
 function fetchFilterData() {
-    fetch('YOUR_SERVER_URL:5000/filter_data')
+    fetch('YOUR-SERVER-URL:5000/filter_data')
     .then(response => response.json())
     .then(data => {
         populateFilterOptions('carMakeFilter', data.car_makes, 'Car Make');
@@ -117,31 +140,16 @@ function setupFilterListeners() {
 }
 
 function applyFilters() {
-    const makeValue = document.getElementById('carMakeFilter').value;
-    const colorValue = document.getElementById('carColorFilter').value;
-    const yearValue = document.getElementById('yearOfManufactureFilter').value;
-    const taxValue = document.getElementById('taxStatusFilter').value;
-    const motValue = document.getElementById('motStatusFilter').value;
-
-    const table = document.getElementById('data-table');
-    const rows = table.getElementsByTagName('tr');
-
-    for (let i = 1; i < rows.length; i++) { // Start from 1 to skip the header row
-        const row = rows[i];
-        const td = row.getElementsByTagName('td');
-        const makeMatches = makeValue === '' || (td[4] && td[4].textContent.includes(`Make: ${makeValue}`));
-        const colorMatches = colorValue === '' || (td[4] && td[4].textContent.includes(`Color: ${colorValue}`));
-        const yearMatches = yearValue === '' || (td[4] && td[4].textContent.includes(`Year: ${yearValue}`));
-        const taxMatches = taxValue === '' || (td[4] && td[4].textContent.includes(`Tax: ${taxValue}`));
-        const motMatches = motValue === '' || (td[4] && td[4].textContent.includes(`MOT: ${motValue}`));
-
-        if (makeMatches && colorMatches && yearMatches && taxMatches && motMatches) {
-            row.style.display = '';
-        } else {
-            row.style.display = 'none';
-        }
-    }
+    currentPage = 1;
+    currentFilters.make = document.getElementById('carMakeFilter').value;
+    currentFilters.color = document.getElementById('carColorFilter').value;
+    currentFilters.year = document.getElementById('yearOfManufactureFilter').value;
+    currentFilters.fuelType = document.getElementById('fuelTypeFilter').value;
+    currentFilters.tax = document.getElementById('taxStatusFilter').value;
+    currentFilters.mot = document.getElementById('motStatusFilter').value;
+    fetchData();
 }
+
 
 function setupDarkModeToggle() {
     const darkModeToggle = document.getElementById('darkModeToggle');
@@ -162,45 +170,14 @@ function applySavedDarkModeState() {
 }
 
 function fetchAndDisplayCounts() {
-    fetch('YOUR_SERVER_URL:5000/plate_counts')
+    fetch('YOUR-SERVER-URL:5000/plate_counts')
         .then(response => response.json())
         .then(data => {
             document.getElementById('count24h').textContent = data.count_24h || '0';
             document.getElementById('count48h').textContent = data.count_48h || '0';
             document.getElementById('count7d').textContent = data.count_7d || '0';
             document.getElementById('count31d').textContent = data.count_31d || '0';
+            document.getElementById('totalPlatesCount').textContent = data.total_count || '0';
         })
         .catch(error => console.error('Error fetching plate counts:', error));
-}
-
-// Implement the filtering logic in applyFilters
-function applyFilters() {
-    const makeValue = document.getElementById('carMakeFilter').value;
-    const colorValue = document.getElementById('carColorFilter').value;
-    const yearValue = document.getElementById('yearOfManufactureFilter').value;
-    const fuelTypeValue = document.getElementById('fuelTypeFilter').value;
-    const taxValue = document.getElementById('taxStatusFilter').value;
-    const motValue = document.getElementById('motStatusFilter').value;
-
-    const table = document.getElementById('data-table');
-    const rows = table.getElementsByTagName('tr');
-
-    for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        const rowData = row.getElementsByTagName('td');
-
-        // Extract values from specific columns
-        const makeMatches = makeValue === '' || (rowData[4] && rowData[4].innerText.includes(`Make: ${makeValue}`));
-        const colorMatches = colorValue === '' || (rowData[4] && rowData[4].innerText.includes(`Color: ${colorValue}`));
-        const yearMatches = yearValue === '' || (rowData[4] && rowData[4].innerText.includes(`Year: ${yearValue}`));
-        const fuelTypeMatches = fuelTypeValue === '' || (rowData[4] && rowData[4].innerText.includes(`Fuel Type: ${fuelTypeValue}`)); 
-        const taxMatches = taxValue === '' || (rowData[4] && rowData[4].innerText.includes(`Tax: ${taxValue}`));
-        const motMatches = motValue === '' || (rowData[4] && rowData[4].innerText.includes(`MOT: ${motValue}`));
-
-        if (makeMatches && colorMatches && yearMatches && fuelTypeMatches && taxMatches && motMatches) {
-            row.style.display = '';
-        } else {
-            row.style.display = 'none';
-        }
-    }
 }
