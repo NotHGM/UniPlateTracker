@@ -181,3 +181,18 @@ function fetchAndDisplayCounts() {
         })
         .catch(error => console.error('Error fetching plate counts:', error));
 }
+
+function searchLicensePlates() {
+    let input = document.getElementById('searchBar');
+    let filter = input.value.toUpperCase();
+    let table = document.getElementById('data-table');
+    let tr = table.getElementsByTagName('tr');
+
+    for (let i = 0; i < tr.length; i++) {
+        let tdArray = tr[i].getElementsByTagName('td');
+        if (tdArray.length > 0) {
+            let textContent = Array.from(tdArray).map(td => td.textContent).join(' ').toUpperCase();
+            tr[i].style.display = textContent.indexOf(filter) > -1 ? '' : 'none';
+        }
+    }
+}
