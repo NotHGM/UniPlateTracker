@@ -100,10 +100,9 @@ def process_plate_data(license_plate, capture_time):
             if datetime.datetime.strptime(capture_time, '%Y-%m-%d %H:%M:%S') - plate['recent_capture_time'] > datetime.timedelta(days=3):
                 vehicle_details = get_vehicle_details(license_plate)
                 # Update vehicle details if new data is available
-                if vehicle_details:
-                    update_vehicle_details(cursor, plate['id'], vehicle_details)
-                else:
-                    logging.error("No new vehicle details available from DVLA.")
+            if datetime.strptime(capture_time, '%Y-%m-%d %H:%M:%S') - plate['recent_capture_time'] > timedelta(days=3):
+                vehicle_details = get_vehicle_details(license_plate)
+                update_vehicle_details(cursor, plate['id'], vehicle_details)
 
             delete_old_video(plate['id'], cursor)
 
@@ -116,12 +115,13 @@ def process_plate_data(license_plate, capture_time):
         else:
             vehicle_details = get_vehicle_details(license_plate)
             cursor.execute('''INSERT INTO license_plates (plate_number, capture_time, recent_capture_time, image_data, video_url,
-                          car_make, car_color, fuel_type, mot_status, tax_status, year_of_manufacture)
-                          VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
-                       (license_plate, capture_time, capture_time, image_data, video_url,
-                        vehicle_details.get('make'), vehicle_details.get('colour'),  # Ensure 'colour' is correctly used
-                        vehicle_details.get('fuelType'), vehicle_details.get('motStatus'),
-                        vehicle_details.get('taxStatus'), vehicle_details.get('yearOfManufacture')))
+                              car_make, car_color, fuel_type, mot_status, tax_status, year_of_manufacture, tax_due_date, mot_expiry_date)
+                              VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
+                           (license_plate, capture_time, capture_time, image_data, video_url,
+                            vehicle_details.get('make'), vehicle_details.get('color'), 
+                            vehicle_details.get('fuelType'), vehicle_details.get('motStatus'), 
+                            vehicle_details.get('taxStatus'), vehicle_details.get('yearOfManufacture'),
+                            vehicle_details.get('taxDueDate'), vehicle_details.get('motExpiryDate')))
         conn.commit()
     except Exception as e:
         logging.error(f"Error processing plate data: {e}")
@@ -131,18 +131,20 @@ def process_plate_data(license_plate, capture_time):
         conn.close()
 
 def update_vehicle_details(cursor, plate_id, vehicle_details):
-    car_color = vehicle_details.get('color', 'Unknown')  # Use 'Unknown' if color is not provided
     cursor.execute('''UPDATE license_plates SET 
                       car_make = %s, 
                       car_color = %s, 
                       fuel_type = %s, 
                       mot_status = %s, 
                       tax_status = %s, 
-                      year_of_manufacture = %s
+                      year_of_manufacture = %s,
+                      tax_due_date = %s,
+                      mot_expiry_date = %s
                       WHERE id = %s''',
-                   (vehicle_details.get('make'), car_color,
+                   (vehicle_details.get('make'), vehicle_details.get('color'), 
                     vehicle_details.get('fuelType'), vehicle_details.get('motStatus'), 
                     vehicle_details.get('taxStatus'), vehicle_details.get('yearOfManufacture'),
+                    vehicle_details.get('taxDueDate'), vehicle_details.get('motExpiryDate'),
                     plate_id))
 
 def delete_old_video(plate_id, cursor):

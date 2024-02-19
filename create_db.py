@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS license_plates (
     video_url VARCHAR(255),   
     mot_status VARCHAR(50),
     tax_status VARCHAR(50),
+    mot_expiry_date DATE,
+    tax_due_date DATE,   
     year_of_manufacture INT
 );
 """

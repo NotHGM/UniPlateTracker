@@ -42,12 +42,11 @@ def view_data():
     mot = request.args.get('mot', '')
 
     try:
-        # Construct query with parameters
         query = """
         SELECT plate_number, MIN(capture_time) AS first_capture_time,
                MAX(recent_capture_time) AS recent_capture_time, image_data,
                car_make, car_color, fuel_type, mot_status, tax_status,
-               year_of_manufacture, video_url
+               year_of_manufacture, video_url, tax_due_date, mot_expiry_date
         FROM license_plates
         WHERE (%s = '' OR car_make = %s)
         AND (%s = '' OR car_color = %s)
@@ -55,7 +54,7 @@ def view_data():
         AND (%s = '' OR fuel_type = %s)
         AND (%s = '' OR tax_status = %s)
         AND (%s = '' OR mot_status = %s)
-        GROUP BY plate_number, image_data, car_make, car_color, fuel_type, mot_status, tax_status, year_of_manufacture, video_url
+        GROUP BY plate_number, image_data, car_make, car_color, fuel_type, mot_status, tax_status, year_of_manufacture, video_url, tax_due_date, mot_expiry_date
         ORDER BY recent_capture_time DESC
         LIMIT %s OFFSET %s
         """
@@ -80,7 +79,9 @@ def view_data():
             'mot_status': row['mot_status'],
             'tax_status': row['tax_status'],
             'year_of_manufacture': row['year_of_manufacture'],
-            'video_url': row['video_url']
+            'video_url': row['video_url'],
+            'tax_due_date': row['tax_due_date'].strftime("%Y-%m-%d") if row['tax_due_date'] else 'N/A',
+            'mot_expiry_date': row['mot_expiry_date'].strftime("%Y-%m-%d") if row['mot_expiry_date'] else 'N/A'
         } for row in rows]
 
         return jsonify({'data': data, 'total_pages': total_pages, 'current_page': page})

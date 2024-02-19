@@ -78,10 +78,10 @@ function populateTable(data) {
                 Color: ${row.car_color || 'N/A'}<br>
                 Year: ${row.year_of_manufacture || 'N/A'}<br>
                 Fuel Type: ${row.fuel_type || 'N/A'}<br>
-                Tax: ${formatTaxStatus(row.tax_status)}<br>
-                MOT: ${formatMOTStatus(row.mot_status)}
+                Tax: <span title="Due: ${row.tax_due_date || 'N/A'}">${formatTaxStatus(row.tax_status)}</span><br>
+                MOT: <span title="Expiry: ${row.mot_expiry_date || 'N/A'}">${formatMOTStatus(row.mot_status)}</span>
             </td>
-            ${videoCaptureEnabled ? `<td>${getVideoHtml(row.plate_number)}</td>` : ''}
+            <td>${getVideoHtml(row.plate_number)}</td>
         `;
         tableBody.appendChild(tr);
     });
@@ -129,16 +129,26 @@ function formatLicensePlate(plate) {
     return plate && plate.length > 4 ? plate.slice(0, 4) + ' ' + plate.slice(4) : plate;
 }
 
-function formatTaxStatus(status) {
-    return status === 'Taxed' ? `<span style="color: green;">${status}</span>` : `<span style="color: red;">${status || 'N/A'}</span>`;
-}
-
-function formatMOTStatus(status) {
-    return status === 'Valid' ? `<span style="color: green;">${status}</span>` : `<span style="color: red;">${status || 'N/A'}</span>`;
-}
-
 function getImageHtml(imageData) {
     return imageData ? `<img src="data:image/jpeg;base64,${imageData}" height="100">` : `<img src="image-not-available.jpg" height="100">`;
+}
+
+function formatTaxStatus(status, taxDueDate) {
+    if (!status) {
+        return 'N/A' + (taxDueDate ? ` (Due: ${taxDueDate})` : '');
+    }
+    const color = status === 'Taxed' ? 'green' : 'red';
+    const dueInfo = taxDueDate ? ` (Due: ${taxDueDate})` : '';
+    return `<span style="color: ${color};">${status}</span>${dueInfo}`;
+}
+
+function formatMOTStatus(status, motExpiryDate) {
+    if (!status) {
+        return 'N/A' + (motExpiryDate ? ` (Expiry: ${motExpiryDate})` : '');
+    }
+    const color = status === 'Valid' ? 'green' : 'red';
+    const expiryInfo = motExpiryDate ? ` (Expiry: ${motExpiryDate})` : '';
+    return `<span style="color: ${color};">${status}</span>${expiryInfo}`;
 }
 
 function getVideoHtml(plate_number) {
@@ -150,7 +160,6 @@ function getVideoHtml(plate_number) {
     }
     return 'No Video Available';
 }
-
 
 function setupFilterListeners() {
     document.getElementById('carMakeFilter').addEventListener('change', applyFilters);
