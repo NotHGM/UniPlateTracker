@@ -4,10 +4,10 @@ import os
 
 # Database connection parameters - update these with your database details
 db_params = {
-    "dbname": "licenseplatestestforgithub",
-    "user": "testforgithub",
-    "password": "Georgetay329",
-    "host": "192.168.1.180",  # or the IP address of your PostgreSQL server
+    "dbname": "DB_NAME",
+    "user": "DB_NAME",
+    "password": "DB_PASSWORD",
+    "host": "DB_HOST",  # or the IP address of your PostgreSQL server
     "port": 5432
 }
 
