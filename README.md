@@ -104,14 +104,6 @@ After starting the backend and frontend, navigate to `http://localhost:8000` (or
 - **Search and Filters**: Narrow down records using search and filters.
 - **Dark Mode**: Toggle between light and dark themes.
 
-## To-Do List
-
-Here are some features and enhancements planned for future updates:
-
-- [X] Pagination: Implement pagination for the displayed license plate data to enhance user experience, especially when dealing with a large number of records.
-- [X] Fix Recent Capture Time: Address issues with the display of recent capture times to ensure accuracy and consistency in the data presented.
-- [ ] Correct Plate Characters Function: Fix the `correct_plate_characters` function to ensure it accurately transforms specific characters in certain positions of the license plate.
-
 ## Credits
 - [Python](https://www.python.org/) - Programming language used.
 - [Flask](https://pypi.org/project/Flask/) - Web framework for Python.
