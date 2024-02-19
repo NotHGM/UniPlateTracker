@@ -142,8 +142,15 @@ function getImageHtml(imageData) {
 }
 
 function getVideoHtml(plate_number) {
-    return plate_number ? `<video width="320" height="240" controls><source src="YOUR-SERVER-URL:5000/video/${plate_number}" type="video/mp4">Your browser does not support the video tag.</video>` : 'No Video Available';
+    if (plate_number) {
+        return `<video width="320" height="240" controls>
+                    <source src="YOUR-SERVER-URL:5000/video/${plate_number}" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>`;
+    }
+    return 'No Video Available';
 }
+
 
 function setupFilterListeners() {
     document.getElementById('carMakeFilter').addEventListener('change', applyFilters);

@@ -96,15 +96,17 @@ def view_data():
 @app.route('/video/<plate_number>')
 def serve_video(plate_number):
     video_directory = 'videos'
-    # Find the latest video file for the given plate number
-    files = [f for f in os.listdir(video_directory) if f.startswith(plate_number)]
-    files.sort(reverse=True)
-    if files:
-        latest_video = files[0]
-        return send_from_directory(video_directory, latest_video)
+    
+    # Find the most recent video file for the given plate number
+    video_files = [f for f in os.listdir(video_directory) if f.startswith(plate_number)]
+    video_files.sort(reverse=True)  # Sort files in descending order (newest first)
+
+    if video_files:
+        latest_video_file = video_files[0]
+        return send_from_directory(video_directory, latest_video_file)
     else:
         return "Video not found", 404
-        
+            
 @app.route('/plate_counts', methods=['GET'])
 def plate_counts():
     conn = get_db_connection()
@@ -138,7 +140,7 @@ def plate_counts():
 
     except Exception as e:
         logging.error(f"Error in plate_counts endpoint: {e}")
-        return jsonify({'error': 'An error occurred counting plates'}), 500
+        return jsonify({'error': str(e)}), 500
 
     finally:
         cursor.close()

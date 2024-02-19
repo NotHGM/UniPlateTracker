@@ -5,6 +5,7 @@ import base64
 import logging
 import time
 import queue
+import threading
 import cv2
 import requests
 import json
@@ -13,7 +14,8 @@ import os
 from config import DB_HOST, DB_NAME, DB_USER, DB_PASS, DB_PORT, \
                    HOME_ASSISTANT_API, LONG_LIVED_ACCESS_TOKEN, \
                    API_KEY_DVLA, RTSP_URL, VIDEOS_DIR, ENABLE_VIDEO_CAPTURE, \
-                   HOME_ASSISTANT_SENSOR_NAME, BACKGROUND_TASK_POLL_RATE
+                   HOME_ASSISTANT_SENSOR_NAME, BACKGROUND_TASK_POLL_RATE, \
+                   BUFFER_DURATION_SECONDS, FPS 
 
 app = Flask(__name__)
 
@@ -74,7 +76,8 @@ def process_plate_data(license_plate, capture_time):
 
     def correct_plate_characters(license_plate):
         char_map = {'0': 'O', '1': 'I', '4': 'A', '5': 'S', '7': 'T', '8': 'B'}
-        return ''.join([char_map.get(char, char) if i in [0, 1, 2, 4, 5, 6] else char for i, char in enumerate(license_plate)])
+        positions = [0, 1, 4, 5, 6]  # Adjusted positions for 7-digit plates
+        return ''.join([char_map.get(char, char) if i in positions else char for i, char in enumerate(license_plate)])
 
     corrected_plate = correct_plate_characters(plate_after_zero_replacement)
     print(f"Final Corrected Plate (Sent to DVLA): {corrected_plate}")
@@ -93,9 +96,14 @@ def process_plate_data(license_plate, capture_time):
         image_data = fetch_image()
         video_url = capture_video_snippet(license_plate, 10) if ENABLE_VIDEO_CAPTURE else None
         if plate:
-            if datetime.strptime(capture_time, '%Y-%m-%d %H:%M:%S') - plate['recent_capture_time'] > timedelta(days=3):
+            # Checking if the plate data needs to be updated
+            if datetime.datetime.strptime(capture_time, '%Y-%m-%d %H:%M:%S') - plate['recent_capture_time'] > datetime.timedelta(days=3):
                 vehicle_details = get_vehicle_details(license_plate)
-                update_vehicle_details(cursor, plate['id'], vehicle_details)
+                # Update vehicle details if new data is available
+                if vehicle_details:
+                    update_vehicle_details(cursor, plate['id'], vehicle_details)
+                else:
+                    logging.error("No new vehicle details available from DVLA.")
 
             delete_old_video(plate['id'], cursor)
 
@@ -108,12 +116,12 @@ def process_plate_data(license_plate, capture_time):
         else:
             vehicle_details = get_vehicle_details(license_plate)
             cursor.execute('''INSERT INTO license_plates (plate_number, capture_time, recent_capture_time, image_data, video_url,
-                              car_make, car_color, fuel_type, mot_status, tax_status, year_of_manufacture)
-                              VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
-                           (license_plate, capture_time, capture_time, image_data, video_url,
-                            vehicle_details.get('make'), vehicle_details.get('color'), 
-                            vehicle_details.get('fuelType'), vehicle_details.get('motStatus'), 
-                            vehicle_details.get('taxStatus'), vehicle_details.get('yearOfManufacture')))
+                          car_make, car_color, fuel_type, mot_status, tax_status, year_of_manufacture)
+                          VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
+                       (license_plate, capture_time, capture_time, image_data, video_url,
+                        vehicle_details.get('make'), vehicle_details.get('colour'),  # Ensure 'colour' is correctly used
+                        vehicle_details.get('fuelType'), vehicle_details.get('motStatus'),
+                        vehicle_details.get('taxStatus'), vehicle_details.get('yearOfManufacture')))
         conn.commit()
     except Exception as e:
         logging.error(f"Error processing plate data: {e}")
@@ -123,6 +131,7 @@ def process_plate_data(license_plate, capture_time):
         conn.close()
 
 def update_vehicle_details(cursor, plate_id, vehicle_details):
+    car_color = vehicle_details.get('color', 'Unknown')  # Use 'Unknown' if color is not provided
     cursor.execute('''UPDATE license_plates SET 
                       car_make = %s, 
                       car_color = %s, 
@@ -131,7 +140,7 @@ def update_vehicle_details(cursor, plate_id, vehicle_details):
                       tax_status = %s, 
                       year_of_manufacture = %s
                       WHERE id = %s''',
-                   (vehicle_details.get('make'), vehicle_details.get('color'), 
+                   (vehicle_details.get('make'), car_color,
                     vehicle_details.get('fuelType'), vehicle_details.get('motStatus'), 
                     vehicle_details.get('taxStatus'), vehicle_details.get('yearOfManufacture'),
                     plate_id))
@@ -144,25 +153,57 @@ def delete_old_video(plate_id, cursor):
         if os.path.exists(old_video_path):
             os.remove(old_video_path)
 
-def capture_video_snippet(license_plate, duration_seconds):
+def buffer_rtsp_stream(frame_queue):
+    """
+    Continuously read from RTSP stream and store frames in a queue.
+    :param frame_queue: A queue object to store frames.
+    """
+    cap = cv2.VideoCapture(RTSP_URL)
+    while True:
+        ret, frame = cap.read()
+        if ret:
+            if frame_queue.full():
+                frame_queue.get()  # Remove oldest frame if the queue is full
+            frame_queue.put((datetime.now(), frame))  # Store timestamp and frame
+
+# Global queue to hold frames
+frame_queue = queue.Queue(maxsize=100)  # Adjust size as needed
+
+# Start the buffering in a separate thread
+threading.Thread(target=buffer_rtsp_stream, args=(frame_queue,), daemon=True).start()
+
+def capture_video_snippet(license_plate, duration_seconds, pre_capture_duration=5):
     rtsp_url = RTSP_URL
-    output_file = f"{VIDEOS_DIR}/{license_plate}_{datetime.now().strftime('%Y%m%d%H%M%S')}.mp4"
+    filename = f"{license_plate}_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.mp4"
+    output_file = os.path.join(VIDEOS_DIR, filename)
+
     cap = cv2.VideoCapture(rtsp_url)
     if not cap.isOpened():
         logging.error("Failed to open RTSP stream")
         return None
+
+    # Get video properties for accurate VideoWriter configuration
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(output_file, fourcc, 20.0, (640, 480))
-    start_time = datetime.now()
-    while (datetime.now() - start_time).seconds < duration_seconds:
+    out = cv2.VideoWriter(output_file, fourcc, fps, (width, height))
+
+    # Adjust start and end time for pre-capture
+    start_time = datetime.now() - timedelta(seconds=pre_capture_duration)
+    end_time = start_time + timedelta(seconds=duration_seconds)
+
+    # Adjusted loop to capture video starting from start_time
+    while datetime.datetime.now() < end_time:
         ret, frame = cap.read()
-        if ret:
+        if ret and datetime.datetime.now() >= start_time:
             out.write(frame)
         else:
             break
+
     cap.release()
     out.release()
-    return output_file.split('/')[-1]
+    return filename
 
 def fetch_license_plate_data():
     headers = {'Authorization': f'Bearer {LONG_LIVED_ACCESS_TOKEN}', 'Content-Type': 'application/json'}

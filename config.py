@@ -22,3 +22,7 @@ RTSP_URL = 'RTSP-URL'
 # Video Capture Configuration
 VIDEOS_DIR = 'videos'
 ENABLE_VIDEO_CAPTURE = True
+
+# Buffer settings for pre-capture video
+BUFFER_DURATION_SECONDS = 5  # Buffer duration in seconds before detection
+FPS = 20  # Approximate frames per second of the RTSP stream
