@@ -13,7 +13,7 @@ import os
 from config import DB_HOST, DB_NAME, DB_USER, DB_PASS, DB_PORT, \
                    HOME_ASSISTANT_API, LONG_LIVED_ACCESS_TOKEN, \
                    API_KEY_DVLA, RTSP_URL, VIDEOS_DIR, ENABLE_VIDEO_CAPTURE, \
-                   HOME_ASSISTANT_SENSOR_NAME
+                   HOME_ASSISTANT_SENSOR_NAME, BACKGROUND_TASK_POLL_RATE
 
 app = Flask(__name__)
 
@@ -183,7 +183,7 @@ def background_task():
                 license_plate, capture_time = result
                 logging.info(f"License Plate Detected: {license_plate}")
                 process_plate_data(license_plate, capture_time)
-            time.sleep(3)
+            time.sleep(BACKGROUND_TASK_POLL_RATE)
     except KeyboardInterrupt:
         print("License Plate Polling has stopped")
         
