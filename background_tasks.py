@@ -8,134 +8,112 @@ import queue
 import cv2
 import requests
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
+import os
+from config import DB_HOST, DB_NAME, DB_USER, DB_PASS, DB_PORT, \
+                   HOME_ASSISTANT_API, LONG_LIVED_ACCESS_TOKEN, \
+                   API_KEY_DVLA, RTSP_URL, VIDEOS_DIR, ENABLE_VIDEO_CAPTURE, \
+                   HOME_ASSISTANT_SENSOR_NAME
 
 app = Flask(__name__)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Database connection settings (Replace with your own settings)
-DB_HOST = 'YOUR_DB_HOST'
-DB_NAME = 'YOUR_DB_NAME'
-DB_USER = 'YOUR_DB_USER'
-DB_PASS = 'YOUR_DB_PASSWORD'
-DB_PORT = 'YOUR_DB_PORT'
+# Ensure video directory exists
+if not os.path.exists(VIDEOS_DIR):
+    os.makedirs(VIDEOS_DIR)
 
-# Home Assistant API settings (Replace with your own settings)
-HOME_ASSISTANT_API = 'YOUR_HOME_ASSISTANT_API'
-LONG_LIVED_ACCESS_TOKEN = 'YOUR_LONG_LIVED_ACCESS_TOKEN'
-
-# DVLA API Key (Replace with your own key)
-API_KEY_DVLA = 'YOUR_API_KEY_DVLA'
-
-# Camera frame rate and RTSP URL (Replace with your own settings)
-CAMERA_FRAME_RATE = 30
-RTSP_URL = 'YOUR_RTSP_URL'
-
-# Headers for Home Assistant API
-headers = {
-    'Authorization': f'Bearer {LONG_LIVED_ACCESS_TOKEN}',
-    'Content-Type': 'application/json'
-}
-
+# Database connection
 def get_db_connection():
-    """ Establish a connection to the database. """
     return psycopg2.connect(
-        host=DB_HOST,
-        database=DB_NAME,
-        user=DB_USER,
-        password=DB_PASS,
-        port=DB_PORT,
-        cursor_factory=RealDictCursor
+        host=DB_HOST, database=DB_NAME, user=DB_USER, 
+        password=DB_PASS, port=DB_PORT, cursor_factory=RealDictCursor
     )
 
+# Fetch vehicle details from DVLA API
 def get_vehicle_details(registration_number):
-    """ Fetch vehicle details from DVLA API. """
     api_url = 'https://driver-vehicle-licensing.api.gov.uk/vehicle-enquiry/v1/vehicles'
-    dvla_headers = {
-        'x-api-key': API_KEY_DVLA,
-        'Content-Type': 'application/json'
-    }
+    headers = {'x-api-key': API_KEY_DVLA, 'Content-Type': 'application/json'}
     data = {'registrationNumber': registration_number}
-    response = requests.post(api_url, headers=dvla_headers, data=json.dumps(data))
+    response = requests.post(api_url, headers=headers, json=data)
     return response.json() if response.status_code == 200 else None
 
+# Capture an image from the camera
 def fetch_image():
-    """ Capture an image from the camera. """
     cap = cv2.VideoCapture(RTSP_URL)
     if not cap.isOpened():
         logging.error('Failed to open RTSP stream')
         return None
-
-    target_frame_index = int(CAMERA_FRAME_RATE * 2)
-    buffer = []
-    for _ in range(target_frame_index + 1):
-        ret, frame = cap.read()
-        if not ret:
-            logging.error('Failed to fetch frame from RTSP stream')
-            cap.release()
-            return None
-        buffer.append(frame)
-    cap.release()
-    target_frame = buffer[-target_frame_index]
-    _, buffer = cv2.imencode('.jpg', target_frame)
+    ret, frame = cap.read()
+    if not ret:
+        logging.error('Failed to fetch frame from RTSP stream')
+        return None
+    _, buffer = cv2.imencode('.jpg', frame)
     return base64.b64encode(buffer).decode('utf-8')
-
-def replace_zero_with_O(license_plate):
-    """ Replace '0' with 'O' in license plate except for 4th and 5th characters. """
-    modified_plate = ''
-    for i, char in enumerate(license_plate):
-        if char == '0' and not (i == 3 or i == 4):
-            modified_plate += 'O'
-        else:
-            modified_plate += char
-    return modified_plate
-
-def correct_plate_characters(license_plate):
-    """ Correct specific characters in certain positions of the license plate. """
-    char_map = {'0': 'O', '1': 'I', '4': 'A', '5': 'S', '7': 'T', '8': 'B'}
-    return ''.join([char_map.get(char, char) if i in [0, 1, 4, 5, 6] else char for i, char in enumerate(license_plate)])
-
+    
 def process_plate_data(license_plate, capture_time):
-    """ Process license plate data. """
-    corrected_plate = correct_plate_characters(license_plate)
-    corrected_plate = replace_zero_with_O(corrected_plate)
+    if not license_plate:
+        logging.error("No license plate data to process.")
+        return
 
-    if not (7 <= len(license_plate) <= 8):
-        logging.warning(f"License plate '{license_plate}' does not meet length constraints.")
+    original_plate = license_plate
+    print(f"Original Plate: {original_plate}")
+
+    def replace_zero_with_O(license_plate):
+        modified_plate = ''
+        for i, char in enumerate(license_plate):
+            if char == '0' and not (i == 2 or i == 5):
+                modified_plate += 'O'
+            else:
+                modified_plate += char
+        return modified_plate
+
+    plate_after_zero_replacement = replace_zero_with_O(original_plate)
+    print(f"Plate after replacing zeros: {plate_after_zero_replacement}")
+
+    def correct_plate_characters(license_plate):
+        char_map = {'0': 'O', '1': 'I', '4': 'A', '5': 'S', '7': 'T', '8': 'B'}
+        return ''.join([char_map.get(char, char) if i in [0, 1, 2, 4, 5, 6] else char for i, char in enumerate(license_plate)])
+
+    corrected_plate = correct_plate_characters(plate_after_zero_replacement)
+    print(f"Final Corrected Plate (Sent to DVLA): {corrected_plate}")
+
+    if not (7 <= len(corrected_plate) <= 8):
+        logging.warning(f"Corrected license plate '{corrected_plate}' does not meet length constraints.")
         return
 
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute('SELECT id, recent_capture_time FROM license_plates WHERE plate_number = %s', (corrected_plate,))
-        existing_plate = cursor.fetchone()
+        cursor.execute('SELECT id, recent_capture_time FROM license_plates WHERE plate_number = %s', (license_plate,))
+        plate = cursor.fetchone()
 
-        if existing_plate:
-            # Convert capture_time to datetime object if it's a string
-            if isinstance(capture_time, str):
-                capture_time = datetime.strptime(capture_time, '%Y-%m-%d %H:%M:%S')
+        # Fetch new image and video for each detection
+        image_data = fetch_image()
+        video_url = capture_video_snippet(license_plate, 10) if ENABLE_VIDEO_CAPTURE else None
+        if plate:
+            if datetime.strptime(capture_time, '%Y-%m-%d %H:%M:%S') - plate['recent_capture_time'] > timedelta(days=3):
+                vehicle_details = get_vehicle_details(license_plate)
+                update_vehicle_details(cursor, plate['id'], vehicle_details)
 
-            # Compare datetime objects
-            if existing_plate['recent_capture_time'] is None or existing_plate['recent_capture_time'] < capture_time:
-                cursor.execute('UPDATE license_plates SET recent_capture_time = %s WHERE id = %s', (capture_time, existing_plate['id']))
+            delete_old_video(plate['id'], cursor)
+
+            cursor.execute('''UPDATE license_plates SET 
+                              recent_capture_time = %s, 
+                              image_data = %s, 
+                              video_url = %s
+                              WHERE id = %s''', 
+                           (capture_time, image_data, video_url, plate['id']))
         else:
-            encoded_image = fetch_image()
-            vehicle_details = get_vehicle_details(corrected_plate.replace(" ", ""))
-            if encoded_image and vehicle_details:
-                cursor.execute('''INSERT INTO license_plates (plate_number, capture_time, recent_capture_time, image_data,
+            vehicle_details = get_vehicle_details(license_plate)
+            cursor.execute('''INSERT INTO license_plates (plate_number, capture_time, recent_capture_time, image_data, video_url,
                               car_make, car_color, fuel_type, mot_status, tax_status, year_of_manufacture)
-                              VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id''',
-                           (corrected_plate, capture_time, capture_time, encoded_image, vehicle_details.get('make', 'Unknown'),
-                            vehicle_details.get('colour', 'Unknown'), vehicle_details.get('fuelType', 'Unknown'),
-                            vehicle_details.get('motStatus', 'Unknown'), vehicle_details.get('taxStatus', 'Unknown'),
-                            vehicle_details.get('yearOfManufacture')))
-                plate_id = cursor.fetchone()['id']
-                logging.info(f"Inserted new plate {corrected_plate}. ID: {plate_id}")
-            else:
-                logging.error('Failed to fetch vehicle details or image for new plate')
-
+                              VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
+                           (license_plate, capture_time, capture_time, image_data, video_url,
+                            vehicle_details.get('make'), vehicle_details.get('color'), 
+                            vehicle_details.get('fuelType'), vehicle_details.get('motStatus'), 
+                            vehicle_details.get('taxStatus'), vehicle_details.get('yearOfManufacture')))
         conn.commit()
     except Exception as e:
         logging.error(f"Error processing plate data: {e}")
@@ -144,53 +122,78 @@ def process_plate_data(license_plate, capture_time):
         cursor.close()
         conn.close()
 
+def update_vehicle_details(cursor, plate_id, vehicle_details):
+    cursor.execute('''UPDATE license_plates SET 
+                      car_make = %s, 
+                      car_color = %s, 
+                      fuel_type = %s, 
+                      mot_status = %s, 
+                      tax_status = %s, 
+                      year_of_manufacture = %s
+                      WHERE id = %s''',
+                   (vehicle_details.get('make'), vehicle_details.get('color'), 
+                    vehicle_details.get('fuelType'), vehicle_details.get('motStatus'), 
+                    vehicle_details.get('taxStatus'), vehicle_details.get('yearOfManufacture'),
+                    plate_id))
+
+def delete_old_video(plate_id, cursor):
+    cursor.execute('SELECT video_url FROM license_plates WHERE id = %s', (plate_id,))
+    video = cursor.fetchone()
+    if video and video['video_url']:
+        old_video_path = os.path.join(VIDEOS_DIR, video['video_url'].split('/')[-1])
+        if os.path.exists(old_video_path):
+            os.remove(old_video_path)
+
+def capture_video_snippet(license_plate, duration_seconds):
+    rtsp_url = RTSP_URL
+    output_file = f"{VIDEOS_DIR}/{license_plate}_{datetime.now().strftime('%Y%m%d%H%M%S')}.mp4"
+    cap = cv2.VideoCapture(rtsp_url)
+    if not cap.isOpened():
+        logging.error("Failed to open RTSP stream")
+        return None
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(output_file, fourcc, 20.0, (640, 480))
+    start_time = datetime.now()
+    while (datetime.now() - start_time).seconds < duration_seconds:
+        ret, frame = cap.read()
+        if ret:
+            out.write(frame)
+        else:
+            break
+    cap.release()
+    out.release()
+    return output_file.split('/')[-1]
+
+def fetch_license_plate_data():
+    headers = {'Authorization': f'Bearer {LONG_LIVED_ACCESS_TOKEN}', 'Content-Type': 'application/json'}
+    url = f"{HOME_ASSISTANT_API}states/{HOME_ASSISTANT_SENSOR_NAME}"
+    response = requests.get(url, headers=headers, timeout=10)
+    if response.status_code == 200 and response.json().get('state') != 'none':
+        license_plate = response.json().get('state')
+        capture_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        return license_plate, capture_time
+    return None, None
+
+def background_task():
+    logging.info("Background task started.")
+    try:
+        while True:
+            result = fetch_license_plate_data()
+            if result:
+                license_plate, capture_time = result
+                logging.info(f"License Plate Detected: {license_plate}")
+                process_plate_data(license_plate, capture_time)
+            time.sleep(3)
+    except KeyboardInterrupt:
+        print("License Plate Polling has stopped")
+        
 @app.route('/add_plate_data_with_image', methods=['POST'])
 def add_plate_data_with_image():
-    """ Endpoint for adding plate data with image. """
     data = request.json
     license_plate = data['plate_number']
     capture_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     process_plate_data(license_plate, capture_time)
     return jsonify({'message': 'Data processed'}), 200
-
-def fetch_license_plate_data():
-    """ Fetch the latest license plate data from Home Assistant API. """
-    global headers
-    url = f"{HOME_ASSISTANT_API}states/sensor.REPLACE-WITH-YOUR-OWN-SENSOR-NAME"
-    
-    try:
-        response = requests.get(url, headers=headers, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            license_plate = data.get('state')
-            if license_plate and license_plate != 'none':
-                capture_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
-                return license_plate, capture_time
-        else:
-            logging.error(f"Failed to fetch license plate data: {response.status_code}, {response.text}")
-    except Exception as e:
-        logging.error(f"Error making API call: {e}")
-
-    return None, None
-
-def background_task():
-    """ Background task for polling new license plate data. """
-    logging.info("Background task started.")
-    while True:
-        try:
-            result = fetch_license_plate_data()
-            if result is not None:
-                license_plate, capture_time = result
-                if license_plate:
-                    logging.info(f"License Plate Detected: {license_plate}")
-                    process_plate_data(license_plate, capture_time)
-                else:
-                    logging.info("No new license plate detected.")
-            else:
-                logging.error("No data received from Home Assistant API.")
-        except Exception as e:
-            logging.error(f"Error during polling: {e}")
-        time.sleep(3) # Poll Rate for scanning the Home Assistant API
 
 if __name__ == '__main__':
     background_task()

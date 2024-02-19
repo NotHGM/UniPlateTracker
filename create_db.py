@@ -4,10 +4,10 @@ import os
 
 # Database connection parameters - update these with your database details
 db_params = {
-    "dbname": "licenseplates",
-    "user": "your_username",
-    "password": "your_password",
-    "host": "localhost",  # or the IP address of your PostgreSQL server
+    "dbname": "licenseplatestestforgithub",
+    "user": "testforgithub",
+    "password": "Georgetay329",
+    "host": "192.168.1.180",  # or the IP address of your PostgreSQL server
     "port": 5432
 }
 
@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS license_plates (
     car_make VARCHAR(255),
     car_color VARCHAR(255),
     fuel_type VARCHAR(255),
+    video_url VARCHAR(255),   
     mot_status VARCHAR(50),
     tax_status VARCHAR(50),
     year_of_manufacture INT

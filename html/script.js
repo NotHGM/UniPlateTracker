@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', function() {
     fetchFilterData();
     applySavedDarkModeState();
     pollForUpdates();
+    checkVideoCaptureEnabled();
 });
 
 let currentPage = 1;
@@ -22,10 +23,10 @@ function fetchData() {
     const url = `YOUR-SERVER-URL:5000/view_data?page=${currentPage}&limit=${limit}&make=${currentFilters.make}&color=${currentFilters.color}&year=${currentFilters.year}&fuelType=${currentFilters.fuelType}&tax=${currentFilters.tax}&mot=${currentFilters.mot}`;
     fetch(url)
         .then(response => response.json())
-        .then(data => {
-            if (data && data.length > 0) {
-                populateTable(data);
-                updatePageCounter();
+        .then(result => {
+            if (result.data && result.data.length > 0) {
+                populateTable(result.data);
+                updatePageCounter(result.total_pages);
             } else {
                 console.error('No data received');
             }
@@ -33,14 +34,17 @@ function fetchData() {
         .catch(error => console.error('Error fetching data:', error));
 }
 
+function updatePageCounter(totalPages) {
+    document.getElementById('currentPage').innerText = `${currentPage} / ${totalPages}`;
+    document.getElementById('prevPage').disabled = currentPage <= 1;
+    document.getElementById('nextPage').disabled = currentPage >= totalPages;
+}
+
 function changePage(increment) {
     currentPage += increment;
     if (currentPage < 1) currentPage = 1;
     fetchData();
-}
-
-function updatePageCounter() {
-    document.getElementById('currentPage').innerText = currentPage;
+    updatePageCounter();
 }
 
 let lastUpdateTime = null;
@@ -77,10 +81,23 @@ function populateTable(data) {
                 Tax: ${formatTaxStatus(row.tax_status)}<br>
                 MOT: ${formatMOTStatus(row.mot_status)}
             </td>
+            ${videoCaptureEnabled ? `<td>${getVideoHtml(row.plate_number)}</td>` : ''}
         `;
         tableBody.appendChild(tr);
     });
 }
+
+function getVideoHtml(plate_number) {
+    if (plate_number) {
+        const videoFilename = plate_number + '_video.mp4'; // Update this line to match your video file naming convention
+        return `<video width="320" height="240" controls>
+                    <source src="YOUR-SERVER-URL:5000/video/${videoFilename}" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>`;
+    }
+    return 'No Video Available';
+}
+
 
 function fetchFilterData() {
     fetch('YOUR-SERVER-URL:5000/filter_data')
@@ -109,6 +126,10 @@ if (select) {
 }
 }
 
+function formatLicensePlate(plate) {
+    return plate && plate.length > 4 ? plate.slice(0, 4) + ' ' + plate.slice(4) : plate;
+}
+
 function formatTaxStatus(status) {
     return status === 'Taxed' ? `<span style="color: green;">${status}</span>` : `<span style="color: red;">${status || 'N/A'}</span>`;
 }
@@ -118,17 +139,11 @@ function formatMOTStatus(status) {
 }
 
 function getImageHtml(imageData) {
-    if (imageData) {
-        return `<img src="data:image/jpeg;base64,${imageData}" height="100">`;
-    }
-    return `<img src="image-not-available.jpg" height="100">`;
+    return imageData ? `<img src="data:image/jpeg;base64,${imageData}" height="100">` : `<img src="image-not-available.jpg" height="100">`;
 }
 
-function formatLicensePlate(plate) {
-    if (plate && plate.length > 4) {
-        return plate.slice(0, 4) + ' ' + plate.slice(4);
-    }
-    return plate;
+function getVideoHtml(plate_number) {
+    return plate_number ? `<video width="320" height="240" controls><source src="YOUR-SERVER-URL:5000/video/${plate_number}" type="video/mp4">Your browser does not support the video tag.</video>` : 'No Video Available';
 }
 
 function setupFilterListeners() {
@@ -195,4 +210,41 @@ function searchLicensePlates() {
             tr[i].style.display = textContent.indexOf(filter) > -1 ? '' : 'none';
         }
     }
+}
+
+let videoCaptureEnabled = false;
+
+function checkVideoCaptureEnabled() {
+    fetch('YOUR-SERVER-URL:5000/video_capture_enabled')
+        .then(response => response.json())
+        .then(data => {
+            videoCaptureEnabled = data.enabled;
+            initializeApp();
+        })
+        .catch(error => console.error('Error checking video capture status:', error));
+}
+
+function initializeApp() {
+    if (!videoCaptureEnabled) {
+        removeVideoColumn();
+    }
+    fetchData();
+    fetchAndDisplayCounts();
+    setupDarkModeToggle();
+    fetchFilterData();
+    applySavedDarkModeState();
+    pollForUpdates();
+}
+
+function removeVideoColumn() {
+    // Remove the video column header
+    const videoHeader = document.querySelector('#data-table th:last-child');
+    if (videoHeader) videoHeader.remove();
+
+    // Remove video cells from each row
+    const rows = document.querySelectorAll('#data-table tbody tr');
+    rows.forEach(row => {
+        const videoCell = row.querySelector('td:last-child');
+        if (videoCell) videoCell.remove();
+    });
 }
