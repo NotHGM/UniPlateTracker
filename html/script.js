@@ -89,15 +89,14 @@ function populateTable(data) {
 
 function getVideoHtml(plate_number) {
     if (plate_number) {
-        const videoFilename = plate_number + '_video.mp4'; // Update this line to match your video file naming convention
+        // Construct the request URL for the latest video of the given plate number
         return `<video width="320" height="240" controls>
-                    <source src="YOUR-SERVER-URL:5000/video/${videoFilename}" type="video/mp4">
+                    <source src="YOUR-SERVER-URL:5000/video/${plate_number}" type="video/mp4">
                     Your browser does not support the video tag.
                 </video>`;
     }
     return 'No Video Available';
 }
-
 
 function fetchFilterData() {
     fetch('YOUR-SERVER-URL:5000/filter_data')
