@@ -95,12 +95,13 @@ def view_data():
 
 @app.route('/video/<plate_number>')
 def serve_video(plate_number):
-    video_directory = 'videos'  # Directory where videos are stored
-    video_filename = f'{plate_number}.mp4'  # Construct the video filename based on the plate number
-
-    # Check if the file exists
-    if os.path.exists(os.path.join(video_directory, video_filename)):
-        return send_from_directory(video_directory, video_filename)
+    video_directory = 'videos'
+    # Find the latest video file for the given plate number
+    files = [f for f in os.listdir(video_directory) if f.startswith(plate_number)]
+    files.sort(reverse=True)
+    if files:
+        latest_video = files[0]
+        return send_from_directory(video_directory, latest_video)
     else:
         return "Video not found", 404
         
