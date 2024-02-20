@@ -81,21 +81,9 @@ function populateTable(data) {
                 Tax: <span title="Due: ${row.tax_due_date || 'N/A'}">${formatTaxStatus(row.tax_status)}</span><br>
                 MOT: <span title="Expiry: ${row.mot_expiry_date || 'N/A'}">${formatMOTStatus(row.mot_status)}</span>
             </td>
-            <td>${getVideoHtml(row.plate_number)}</td>
         `;
         tableBody.appendChild(tr);
     });
-}
-
-function getVideoHtml(plate_number) {
-    if (plate_number) {
-        // Construct the request URL for the latest video of the given plate number
-        return `<video width="320" height="240" controls>
-                    <source src="YOUR-SERVER-URL:5000/video/${plate_number}" type="video/mp4">
-                    Your browser does not support the video tag.
-                </video>`;
-    }
-    return 'No Video Available';
 }
 
 function fetchFilterData() {
@@ -153,6 +141,7 @@ function formatMOTStatus(status, motExpiryDate) {
 
 function getVideoHtml(plate_number) {
     if (plate_number) {
+        // Construct the request URL for the latest video of the given plate number
         return `<video width="320" height="240" controls>
                     <source src="YOUR-SERVER-URL:5000/video/${plate_number}" type="video/mp4">
                     Your browser does not support the video tag.

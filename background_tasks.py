@@ -169,43 +169,65 @@ def buffer_rtsp_stream(frame_queue):
             frame_queue.put((datetime.now(), frame))  # Store timestamp and frame
 
 # Global queue to hold frames
-frame_queue = queue.Queue(maxsize=100)  # Adjust size as needed
+#frame_queue = queue.Queue(maxsize=100)  # Adjust size as needed
 
 # Start the buffering in a separate thread
-threading.Thread(target=buffer_rtsp_stream, args=(frame_queue,), daemon=True).start()
+#threading.Thread(target=buffer_rtsp_stream, args=(frame_queue,), daemon=True).start()
 
-def capture_video_snippet(license_plate, duration_seconds, pre_capture_duration=5):
+#def capture_video_snippet(license_plate, duration_seconds, pre_capture_duration=5):
+    """
+    Capture a video snippet around the detection time.
+    :param license_plate: License plate number to identify the video file.
+    :param duration_seconds: Total duration of the video to capture.
+    :param pre_capture_duration: Duration to capture before the current time (default 5 seconds).
+    :return: Filename of the captured video.
+    """
     rtsp_url = RTSP_URL
-    filename = f"{license_plate}_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.mp4"
+    filename = f"{license_plate}.mp4"
     output_file = os.path.join(VIDEOS_DIR, filename)
 
-    cap = cv2.VideoCapture(rtsp_url)
-    if not cap.isOpened():
-        logging.error("Failed to open RTSP stream")
+    # Attempt to connect to the RTSP stream
+    cap = connect_to_rtsp(rtsp_url)
+    if cap is None:
+        logging.error("Failed to connect to RTSP stream")
         return None
 
-    # Get video properties for accurate VideoWriter configuration
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(output_file, fourcc, fps, (width, height))
+    out = cv2.VideoWriter(output_file, fourcc, FPS, (640, 480))
 
-    # Adjust start and end time for pre-capture
-    start_time = datetime.now() - timedelta(seconds=pre_capture_duration)
-    end_time = start_time + timedelta(seconds=duration_seconds)
-
-    # Adjusted loop to capture video starting from start_time
-    while datetime.datetime.now() < end_time:
+    end_time = datetime.now() + timedelta(seconds=duration_seconds)
+    while datetime.now() < end_time:
         ret, frame = cap.read()
-        if ret and datetime.datetime.now() >= start_time:
+        if ret:
             out.write(frame)
         else:
-            break
+            logging.error("Failed to read frame from RTSP stream")
+            cap = connect_to_rtsp(rtsp_url)
+            if cap is None:
+                break
 
     cap.release()
     out.release()
     return filename
+
+#def connect_to_rtsp(rtsp_url, retry_interval=5, max_attempts=3):
+    """
+    Attempt to connect to an RTSP stream with retries.
+    :param rtsp_url: URL of the RTSP stream.
+    :param retry_interval: Time in seconds to wait between retries.
+    :param max_attempts: Maximum number of attempts to connect.
+    :return: cv2.VideoCapture object or None if unable to connect.
+    """
+    attempts = 0
+    while attempts < max_attempts:
+        cap = cv2.VideoCapture(rtsp_url)
+        if cap.isOpened():
+            return cap
+        logging.warning(f"Unable to connect to RTSP stream. Attempt {attempts + 1} of {max_attempts}. Retrying in {retry_interval} seconds.")
+        time.sleep(retry_interval)
+        attempts += 1
+    logging.error("Failed to connect to RTSP stream after multiple attempts.")
+    return None
 
 def fetch_license_plate_data():
     headers = {'Authorization': f'Bearer {LONG_LIVED_ACCESS_TOKEN}', 'Content-Type': 'application/json'}
