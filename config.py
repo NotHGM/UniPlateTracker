@@ -19,9 +19,9 @@ API_KEY_DVLA = 'DVLA-API-KEY'
 # RTSP Stream URL
 RTSP_URL = 'RTSP-URL'
 
-# Video Capture Configuration
+# Video Capture Configuration (STILL IN EARLY BETA TESTING)
 VIDEOS_DIR = 'videos'
-ENABLE_VIDEO_CAPTURE = True
+ENABLE_VIDEO_CAPTURE = False # DO NOT SET TO TRUE UNTIL VERSION 1.0.0
 
 # Buffer settings for pre-capture video
 BUFFER_DURATION_SECONDS = 5  # Buffer duration in seconds before detection
