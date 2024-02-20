@@ -104,6 +104,11 @@ After starting the backend and frontend, navigate to `http://localhost:8000` (or
 - **Search and Filters**: Narrow down records using search and filters.
 - **Dark Mode**: Toggle between light and dark themes.
 
+## To-Do/Fix
+- [ ] Fix Video Capture
+- [ ] Fix Returning Colour from DVLA API
+- [ ] Fix `undefined` when changing pages
+
 ## Credits
 - [Python](https://www.python.org/) - Programming language used.
 - [Flask](https://pypi.org/project/Flask/) - Web framework for Python.
