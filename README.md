@@ -1,8 +1,5 @@
 # UniPlateTracker
 
-> [!CAUTION]
-> THIS IS A DEVELOPMENT BRANCH. FEATURES MAY NOT BE WORKING, SO PLEASE MAKE SURE YOU ONLY DOWNLOAD THE MAIN BRANCH!
-
 ## Overview
 UniPlateTracker is a web application for monitoring and displaying information about license plates captured by a UniFi Protect camera with AI license plate detection. It processes license plate data, interacts with the DVLA API for vehicle details, and presents the information in a user-friendly interface. The system supports filtering, searching, real-time data updates, and local video storage for each detected plate.
 
@@ -101,6 +98,12 @@ After starting the backend and frontend, navigate to `http://localhost:8000` or 
 - Search and Filters: For narrowing down records.
 - Dark Mode: Toggle between light and dark themes.
 - Video Playback: View locally stored videos for each plate detection.
+
+## To-Do/Fix
+- [ ] Fix Video Capture
+- [ ] Fix Returning Colour from DVLA API
+- [ ] Fix `undefined` when changing pages
+
 
 ## Credits
 - [Python](https://www.python.org/) - Programming language used.

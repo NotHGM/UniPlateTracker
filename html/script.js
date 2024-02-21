@@ -169,7 +169,6 @@ function applyFilters() {
     fetchData();
 }
 
-
 function setupDarkModeToggle() {
     const darkModeToggle = document.getElementById('darkModeToggle');
     darkModeToggle.addEventListener('change', function() {
