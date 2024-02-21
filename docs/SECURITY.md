@@ -6,7 +6,9 @@ This section lists which versions of the License Plate Dashboard project are cur
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.9.5 (Current Version)   | :white_check_mark: |
+| 1.0.0 (Next Version) |✅|
+| 0.9.9 (Current Version) |✅|
+| 0.9.5   | ❌ |
 
 ## Reporting a Vulnerability
 

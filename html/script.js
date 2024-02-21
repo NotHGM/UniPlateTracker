@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', function() {
     fetchFilterData();
     applySavedDarkModeState();
     pollForUpdates();
+    checkVideoCaptureEnabled();
 });
 
 let currentPage = 1;
@@ -22,10 +23,10 @@ function fetchData() {
     const url = `YOUR-SERVER-URL:5000/view_data?page=${currentPage}&limit=${limit}&make=${currentFilters.make}&color=${currentFilters.color}&year=${currentFilters.year}&fuelType=${currentFilters.fuelType}&tax=${currentFilters.tax}&mot=${currentFilters.mot}`;
     fetch(url)
         .then(response => response.json())
-        .then(data => {
-            if (data && data.length > 0) {
-                populateTable(data);
-                updatePageCounter();
+        .then(result => {
+            if (result.data && result.data.length > 0) {
+                populateTable(result.data);
+                updatePageCounter(result.total_pages);
             } else {
                 console.error('No data received');
             }
@@ -33,14 +34,17 @@ function fetchData() {
         .catch(error => console.error('Error fetching data:', error));
 }
 
+function updatePageCounter(totalPages) {
+    document.getElementById('currentPage').innerText = `${currentPage} / ${totalPages}`;
+    document.getElementById('prevPage').disabled = currentPage <= 1;
+    document.getElementById('nextPage').disabled = currentPage >= totalPages;
+}
+
 function changePage(increment) {
     currentPage += increment;
     if (currentPage < 1) currentPage = 1;
     fetchData();
-}
-
-function updatePageCounter() {
-    document.getElementById('currentPage').innerText = currentPage;
+    updatePageCounter();
 }
 
 let lastUpdateTime = null;
@@ -74,8 +78,8 @@ function populateTable(data) {
                 Color: ${row.car_color || 'N/A'}<br>
                 Year: ${row.year_of_manufacture || 'N/A'}<br>
                 Fuel Type: ${row.fuel_type || 'N/A'}<br>
-                Tax: ${formatTaxStatus(row.tax_status)}<br>
-                MOT: ${formatMOTStatus(row.mot_status)}
+                Tax: <span title="Due: ${row.tax_due_date || 'N/A'}">${formatTaxStatus(row.tax_status)}</span><br>
+                MOT: <span title="Expiry: ${row.mot_expiry_date || 'N/A'}">${formatMOTStatus(row.mot_status)}</span>
             </td>
         `;
         tableBody.appendChild(tr);
@@ -109,26 +113,41 @@ if (select) {
 }
 }
 
-function formatTaxStatus(status) {
-    return status === 'Taxed' ? `<span style="color: green;">${status}</span>` : `<span style="color: red;">${status || 'N/A'}</span>`;
-}
-
-function formatMOTStatus(status) {
-    return status === 'Valid' ? `<span style="color: green;">${status}</span>` : `<span style="color: red;">${status || 'N/A'}</span>`;
+function formatLicensePlate(plate) {
+    return plate && plate.length > 4 ? plate.slice(0, 4) + ' ' + plate.slice(4) : plate;
 }
 
 function getImageHtml(imageData) {
-    if (imageData) {
-        return `<img src="data:image/jpeg;base64,${imageData}" height="100">`;
-    }
-    return `<img src="image-not-available.jpg" height="100">`;
+    return imageData ? `<img src="data:image/jpeg;base64,${imageData}" height="100">` : `<img src="image-not-available.jpg" height="100">`;
 }
 
-function formatLicensePlate(plate) {
-    if (plate && plate.length > 4) {
-        return plate.slice(0, 4) + ' ' + plate.slice(4);
+function formatTaxStatus(status, taxDueDate) {
+    if (!status) {
+        return 'N/A' + (taxDueDate ? ` (Due: ${taxDueDate})` : '');
     }
-    return plate;
+    const color = status === 'Taxed' ? 'green' : 'red';
+    const dueInfo = taxDueDate ? ` (Due: ${taxDueDate})` : '';
+    return `<span style="color: ${color};">${status}</span>${dueInfo}`;
+}
+
+function formatMOTStatus(status, motExpiryDate) {
+    if (!status) {
+        return 'N/A' + (motExpiryDate ? ` (Expiry: ${motExpiryDate})` : '');
+    }
+    const color = status === 'Valid' ? 'green' : 'red';
+    const expiryInfo = motExpiryDate ? ` (Expiry: ${motExpiryDate})` : '';
+    return `<span style="color: ${color};">${status}</span>${expiryInfo}`;
+}
+
+function getVideoHtml(plate_number) {
+    if (plate_number) {
+        // Construct the request URL for the latest video of the given plate number
+        return `<video width="320" height="240" controls>
+                    <source src="YOUR-SERVER-URL:5000/video/${plate_number}" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>`;
+    }
+    return 'No Video Available';
 }
 
 function setupFilterListeners() {
@@ -194,4 +213,41 @@ function searchLicensePlates() {
             tr[i].style.display = textContent.indexOf(filter) > -1 ? '' : 'none';
         }
     }
+}
+
+let videoCaptureEnabled = false;
+
+function checkVideoCaptureEnabled() {
+    fetch('YOUR-SERVER-URL:5000/video_capture_enabled')
+        .then(response => response.json())
+        .then(data => {
+            videoCaptureEnabled = data.enabled;
+            initializeApp();
+        })
+        .catch(error => console.error('Error checking video capture status:', error));
+}
+
+function initializeApp() {
+    if (!videoCaptureEnabled) {
+        removeVideoColumn();
+    }
+    fetchData();
+    fetchAndDisplayCounts();
+    setupDarkModeToggle();
+    fetchFilterData();
+    applySavedDarkModeState();
+    pollForUpdates();
+}
+
+function removeVideoColumn() {
+    // Remove the video column header
+    const videoHeader = document.querySelector('#data-table th:last-child');
+    if (videoHeader) videoHeader.remove();
+
+    // Remove video cells from each row
+    const rows = document.querySelectorAll('#data-table tbody tr');
+    rows.forEach(row => {
+        const videoCell = row.querySelector('td:last-child');
+        if (videoCell) videoCell.remove();
+    });
 }

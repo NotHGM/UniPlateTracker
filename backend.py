@@ -1,8 +1,10 @@
-from flask import Flask, request, jsonify
+from flask import Flask, Response, request, jsonify, send_from_directory
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import os
 from flask_cors import CORS
+from config import DB_HOST, DB_NAME, DB_USER, DB_PASS, DB_PORT, \
+                   ENABLE_VIDEO_CAPTURE
 
 app = Flask(__name__)
 CORS(app)
@@ -11,12 +13,6 @@ CORS(app)
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Database connection settings (Replace with your own settings)
-DB_HOST = 'YOUR_DB_HOST'
-DB_NAME = 'YOUR_DB_NAME'
-DB_USER = 'YOUR_DB_USER'
-DB_PASS = 'YOUR_DB_PASSWORD'
-DB_PORT = 'YOUR_DB_PORT'
 
 def get_db_connection():
     """ Establish a connection to the database. """
@@ -46,12 +42,11 @@ def view_data():
     mot = request.args.get('mot', '')
 
     try:
-        # Construct query with parameters
         query = """
         SELECT plate_number, MIN(capture_time) AS first_capture_time,
                MAX(recent_capture_time) AS recent_capture_time, image_data,
                car_make, car_color, fuel_type, mot_status, tax_status,
-               year_of_manufacture
+               year_of_manufacture, video_url, tax_due_date, mot_expiry_date
         FROM license_plates
         WHERE (%s = '' OR car_make = %s)
         AND (%s = '' OR car_color = %s)
@@ -59,12 +54,18 @@ def view_data():
         AND (%s = '' OR fuel_type = %s)
         AND (%s = '' OR tax_status = %s)
         AND (%s = '' OR mot_status = %s)
-        GROUP BY plate_number, image_data, car_make, car_color, fuel_type, mot_status, tax_status, year_of_manufacture
+        GROUP BY plate_number, image_data, car_make, car_color, fuel_type, mot_status, tax_status, year_of_manufacture, video_url, tax_due_date, mot_expiry_date
         ORDER BY recent_capture_time DESC
         LIMIT %s OFFSET %s
         """
         cursor.execute(query, (make, make, color, color, year, year, fuelType, fuelType, tax, tax, mot, mot, limit, offset))
+
         rows = cursor.fetchall()
+
+        # Calculate the total number of pages
+        cursor.execute('SELECT COUNT(*) FROM license_plates')
+        total_rows = cursor.fetchone()['count']
+        total_pages = (total_rows + limit - 1) // limit
 
         # Format data for JSON response
         data = [{
@@ -77,10 +78,14 @@ def view_data():
             'fuel_type': row['fuel_type'],
             'mot_status': row['mot_status'],
             'tax_status': row['tax_status'],
-            'year_of_manufacture': row['year_of_manufacture']            
+            'year_of_manufacture': row['year_of_manufacture'],
+            'video_url': row['video_url'],
+            'tax_due_date': row['tax_due_date'].strftime("%Y-%m-%d") if row['tax_due_date'] else 'N/A',
+            'mot_expiry_date': row['mot_expiry_date'].strftime("%Y-%m-%d") if row['mot_expiry_date'] else 'N/A'
         } for row in rows]
 
-        return jsonify(data)
+        return jsonify({'data': data, 'total_pages': total_pages, 'current_page': page})
+
     except Exception as e:
         logging.error(f"Error in view_data endpoint: {e}")
         return jsonify({'error': 'An error occurred fetching data'}), 500
@@ -89,6 +94,20 @@ def view_data():
         cursor.close()
         conn.close()
 
+@app.route('/video/<plate_number>')
+def serve_video(plate_number):
+    video_directory = 'videos'
+    
+    # Find the most recent video file for the given plate number
+    video_files = [f for f in os.listdir(video_directory) if f.startswith(plate_number)]
+    video_files.sort(reverse=True)  # Sort files in descending order (newest first)
+
+    if video_files:
+        latest_video_file = video_files[0]
+        return send_from_directory(video_directory, latest_video_file)
+    else:
+        return "Video not found", 404
+            
 @app.route('/plate_counts', methods=['GET'])
 def plate_counts():
     conn = get_db_connection()
@@ -135,6 +154,10 @@ def plate_counts():
         'count_31d': count_31d,
         'total_count': total_count
     })
+    
+@app.route('/video_capture_enabled', methods=['GET'])
+def video_capture_enabled():
+    return jsonify({'enabled': ENABLE_VIDEO_CAPTURE})
 
 @app.route('/last_update_time', methods=['GET'])
 def last_update_time():
