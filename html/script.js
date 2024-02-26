@@ -43,8 +43,7 @@ function updatePageCounter(totalPages) {
 function changePage(increment) {
     currentPage += increment;
     if (currentPage < 1) currentPage = 1;
-    fetchData();
-    updatePageCounter();
+    fetchData(); // This fetches new data and should also handle updating the page count
 }
 
 let lastUpdateTime = null;
