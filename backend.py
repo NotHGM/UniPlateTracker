@@ -43,21 +43,23 @@ def view_data():
 
     try:
         query = """
-        SELECT plate_number, MIN(capture_time) AS first_capture_time,
-               MAX(recent_capture_time) AS recent_capture_time, image_data,
-               car_make, car_color, fuel_type, mot_status, tax_status,
-               year_of_manufacture, video_url, tax_due_date, mot_expiry_date
-        FROM license_plates
-        WHERE (%s = '' OR car_make = %s)
-        AND (%s = '' OR car_color = %s)
-        AND (%s = '' OR year_of_manufacture::text = %s)
-        AND (%s = '' OR fuel_type = %s)
-        AND (%s = '' OR tax_status = %s)
-        AND (%s = '' OR mot_status = %s)
-        GROUP BY plate_number, image_data, car_make, car_color, fuel_type, mot_status, tax_status, year_of_manufacture, video_url, tax_due_date, mot_expiry_date
-        ORDER BY recent_capture_time DESC
-        LIMIT %s OFFSET %s
-        """
+            SELECT plate_number, MIN(capture_time) AS first_capture_time,
+            MAX(recent_capture_time) AS recent_capture_time, image_data,
+            car_make, car_color, fuel_type, mot_status, tax_status,
+            year_of_manufacture, video_url, COALESCE(tax_due_date, 'N/A') AS tax_due_date, 
+            COALESCE(mot_expiry_date, 'N/A') AS mot_expiry_date
+            FROM license_plates
+            WHERE (%s = '' OR car_make = %s)
+            AND (%s = '' OR car_color = %s)
+            AND (%s = '' OR year_of_manufacture::text = %s)
+            AND (%s = '' OR fuel_type = %s)
+            AND (%s = '' OR tax_status = %s)
+            AND (%s = '' OR mot_status = %s)
+            GROUP BY plate_number, image_data, car_make, car_color, fuel_type, mot_status, tax_status, 
+            year_of_manufacture, video_url, tax_due_date, mot_expiry_date
+            ORDER BY recent_capture_time DESC
+            LIMIT %s OFFSET %s
+            """
         cursor.execute(query, (make, make, color, color, year, year, fuelType, fuelType, tax, tax, mot, mot, limit, offset))
 
         rows = cursor.fetchall()
