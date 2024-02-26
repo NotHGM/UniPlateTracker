@@ -105,7 +105,7 @@ After starting the backend and frontend, navigate to `http://localhost:8000` or 
 ## To-Do/Fix
 - [ ] Fix Video Capture
 - [ ] Fix Returning Colour from DVLA API
-- [ ] Fix `undefined` when changing pages
+- [X] Fix `undefined` when changing pages
 
 
 ## Credits
