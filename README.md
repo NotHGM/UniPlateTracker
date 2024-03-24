@@ -1,5 +1,8 @@
 # UniPlateTracker
 
+>[!NOTE]
+>Latest Version of UniFi Protect 3.x has caused issues with Home Assistant, So this will currently not work. Please see the Home Assistant PSA [Unifi Protect 3.x Backward Compatibility Issue with versions below 2024.3.2](https://community.home-assistant.io/t/psa-unifi-protect-3-x-backward-compatibility-issue-with-versions-below-2024-3-2/706984)
+
 > [!WARNING]
 > Video Capture is currently non-functional so please do not enable it in `config.py`.
 
