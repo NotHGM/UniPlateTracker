@@ -1,8 +1,5 @@
 # UniPlateTracker
 
->[!NOTE]
->Latest Version of UniFi Protect 3.x has caused issues with Home Assistant, So this will currently not work. Please see the Home Assistant PSA [Unifi Protect 3.x Backward Compatibility Issue with versions below 2024.3.2](https://community.home-assistant.io/t/psa-unifi-protect-3-x-backward-compatibility-issue-with-versions-below-2024-3-2/706984)
-
 > [!WARNING]
 > Video Capture is currently non-functional so please do not enable it in `config.py`.
 
@@ -31,8 +28,8 @@ Run the provided Python script (`create_db.py`) to set up the necessary tables i
 ### Prerequisites
 - Python 3.x and pip (Python package manager).
 - PostgreSQL database.
-- UniFi Protect Camera with AI license plate detection. [Learn more](https://unifi-protect.ui.com/).
-- Home Assistant setup. [Home Assistant Official Site](https://www.home-assistant.io/).
+- UniFi Protect Camera with AI license plate detection. Version 3.x or Higher [Learn more](https://unifi-protect.ui.com/).
+- Home Assistant setup. Core 2024.3.3 & Operating System 12.1 or Higher [Home Assistant Official Site](https://www.home-assistant.io/).
 - HTTP server (for hosting the web interface).
 
 > [!NOTE]
