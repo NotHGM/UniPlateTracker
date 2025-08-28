@@ -111,7 +111,12 @@
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.551 0.027 264.364);
 }
-
+.dark .badge-default {
+  @apply bg-green-800 text-green-100;
+}
+.badge-default {
+  @apply border-transparent bg-green-500 text-primary-foreground hover:bg-green-500/80;
+}
 @layer base {
   * {
     @apply border-border outline-ring/50;

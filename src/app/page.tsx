@@ -1,30 +1,31 @@
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+// src/app/page.tsx
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { DataPagination } from "@/components/app/data-pagination";
-import { LicensePlate, PlatesApiResponse } from "@/lib/types";
+import { PlatesApiResponse } from "@/lib/types";
+import { PlatesTable } from "@/components/app/plates-table";
 
+// Update props to include all possible filters from your API
 interface HomePageProps {
-  searchParams?: {
+  searchParams: {
     page?: string;
+    make?: string;
+    color?: string;
+    year?: string;
+    fuelType?: string;
+    tax?: string;
+    mot?: string;
   };
 }
 
 export default async function HomePage({ searchParams }: HomePageProps) {
-  const currentPage = Number(searchParams?.page) || 1;
+  // Convert searchParams object to a query string, filtering out undefined values
+  const query = new URLSearchParams(
+      Object.entries(searchParams).reduce((acc, [key, value]) => {
+        if (value) acc[key] = value;
+        return acc;
+      }, {} as Record<string, string>)
+  ).toString();
+
   const baseUrl = process.env.NEXTAUTH_URL;
 
   let apiData: PlatesApiResponse | null = null;
@@ -34,8 +35,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     fetchError = "Configuration error: NEXTAUTH_URL is not set.";
   } else {
     try {
-      const response = await fetch(`${baseUrl}/api/plates?page=${currentPage}`, {
-        cache: 'no-store',
+      const response = await fetch(`${baseUrl}/api/plates?${query}`, {
+        cache: 'no-store', // Important for dynamic data
       });
       if (!response.ok) throw new Error(`API responded with ${response.status}`);
       apiData = await response.json();
@@ -44,9 +45,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       fetchError = "Could not connect to the API service.";
     }
   }
-
-  const plates = apiData?.data ?? [];
-  const pagination = apiData?.pagination ?? { currentPage: 1, totalPages: 0 };
 
   return (
       <main className="container mx-auto p-4 md:p-8">
@@ -64,61 +62,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                   <AlertDescription>{fetchError}</AlertDescription>
                 </Alert>
             ) : (
-                <>
-                  <div className="border rounded-md">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          {/* Add a new column for the image */}
-                          <TableHead className="w-[150px]">Image</TableHead>
-                          <TableHead>Number Plate</TableHead>
-                          <TableHead>Make & Color</TableHead>
-                          <TableHead className="text-right">Last Seen</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {plates.length > 0 ? (
-                            plates.map((plate: LicensePlate) => (
-                                <TableRow key={plate.id}>
-                                  {/* Render the image directly from the base64 string */}
-                                  <TableCell>
-                                    {plate.image_url ? (
-                                        <img
-                                            src={plate.image_url}
-                                            alt={`Capture of ${plate.plate_number}`}
-                                            className="w-full h-auto rounded-md object-cover"
-                                        />
-                                    ) : (
-                                        <div className="w-full h-16 bg-muted rounded-md flex items-center justify-center text-xs text-muted-foreground">
-                                          No Image
-                                        </div>
-                                    )}
-                                  </TableCell>
-                                  <TableCell className="font-medium">{plate.plate_number}</TableCell>
-                                  <TableCell>{plate.car_make || 'N/A'} - {plate.car_color || 'N/A'}</TableCell>
-                                  <TableCell className="text-right">
-                                    {new Date(plate.recent_capture_time).toLocaleString()}
-                                  </TableCell>
-                                </TableRow>
-                            ))
-                        ) : (
-                            <TableRow>
-                              <TableCell colSpan={4} className="h-24 text-center">
-                                No data available. Waiting for the first plate detection.
-                              </TableCell>
-                            </TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
-
-                  <div className="py-4">
-                    <DataPagination
-                        currentPage={pagination.currentPage}
-                        totalPages={pagination.totalPages}
-                    />
-                  </div>
-                </>
+                <PlatesTable apiData={apiData} />
             )}
           </CardContent>
         </Card>
