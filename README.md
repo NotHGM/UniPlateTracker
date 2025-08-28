@@ -105,7 +105,7 @@ The following variables must be set in your `.env.local` file for the applicatio
 
 ## 🗺️ Future Roadmap
 
-- [ ] **DVLA Integration:** Fetch vehicle details (make, color, tax status) from the DVLA API.
+- [X] **DVLA Integration:** Fetch vehicle details (make, color, tax status) from the DVLA API.
 - [ ] **User Authentication:** Implement user logins and role-based access control with NextAuth.js.
 - [ ] **Advanced Filtering & Search:** Add UI controls to filter the data table by make, color, date, etc.
 - [ ] **Dashboard Analytics:** Add charts and graphs to visualize detection trends over time.
