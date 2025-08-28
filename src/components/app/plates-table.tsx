@@ -17,11 +17,12 @@ import styles from "./plates.module.css";
 dayjs.extend(relativeTime);
 
 interface PlatesTableProps {
-    apiData: PlatesApiResponse | null;
+    initialApiData: PlatesApiResponse | null;
 }
 
 const formatPlate = (plate: string | null): JSX.Element => {
     if (!plate) return <>{'N/A'}</>;
+    plate = plate.replace(/\s/g, '');
     if (plate.length >= 7) {
         const firstPart = plate.substring(0, 4);
         const secondPart = plate.substring(4);
@@ -38,96 +39,101 @@ const getStatusClass = (status: string | null): string => {
     return styles.badgeSecondary;
 };
 
-export function PlatesTable({ apiData }: PlatesApiResponse) {
+export function PlatesTable({ initialApiData }: PlatesTableProps) {
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
 
     const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
     const [filters, setFilters] = useState({
-        make: searchParams.get('make') || '',
-        color: searchParams.get('color') || '',
-        year: searchParams.get('year') || '',
+        make: searchParams.get('make') || 'all',
+        color: searchParams.get('color') || 'all',
+        year: searchParams.get('year') || 'all',
+        mot: searchParams.get('mot') || 'all',
+        tax: searchParams.get('tax') || 'all',
     });
 
-    const plates = apiData?.data ?? [];
-    const pagination = apiData?.pagination ?? { currentPage: 1, totalPages: 0 };
+    const plates = initialApiData?.data ?? [];
+    const pagination = initialApiData?.pagination ?? { currentPage: 1, totalPages: 0 };
+    const filterOptions = initialApiData?.filterOptions ?? { makes: [], colors: [], years: [] };
 
     useEffect(() => {
         const timer = setTimeout(() => {
-            const current = new URLSearchParams(Array.from(searchParams.entries()));
+            const current = new URLSearchParams(searchParams.toString());
             if (searchTerm) {
                 current.set("search", searchTerm);
             } else {
                 current.delete("search");
             }
-            // Preserve other filters when searching
-            Object.entries(filters).forEach(([key, value]) => {
-                if (value) current.set(key, value);
-                else current.delete(key);
-            });
             current.set("page", "1");
-            router.push(`${pathname}?${current.toString()}`);
+            router.push(`${pathname}?${current.toString()}`, { scroll: false });
         }, 500);
 
         return () => clearTimeout(timer);
-    }, [searchTerm, pathname, router, filters]);
+    }, [searchTerm, searchParams, pathname, router]);
 
-
-    const handleApplyTextFilters = () => {
-        const current = new URLSearchParams(Array.from(searchParams.entries()));
-        for (const [key, value] of Object.entries(filters)) {
-            if (value) current.set(key, value);
-            else current.delete(key);
-        }
+    const handleApplyFilters = () => {
+        const current = new URLSearchParams(searchParams.toString());
+        Object.entries(filters).forEach(([key, value]) => {
+            if (value && value !== 'all') {
+                current.set(key, value);
+            } else {
+                current.delete(key);
+            }
+        });
         current.set("page", "1");
-        router.push(`${pathname}?${current.toString()}`);
-    };
-
-    const handleSelectFilterChange = (type: 'mot' | 'tax', value: string) => {
-        const current = new URLSearchParams(Array.from(searchParams.entries()));
-        if (value === 'all') current.delete(type);
-        else current.set(type, value);
-        current.set("page", "1");
-        router.push(`${pathname}?${current.toString()}`);
+        router.push(`${pathname}?${current.toString()}`, { scroll: false });
     };
 
     const handleClearFilters = () => {
-        router.push(pathname);
+        setSearchTerm('');
+        setFilters({ make: 'all', color: 'all', year: 'all', mot: 'all', tax: 'all' });
+        router.push(pathname, { scroll: false });
     }
 
     return (
-        <>
-            <div className="space-y-4 mb-4 p-4 border rounded-lg bg-card">
-                <Input placeholder="Search for a license plate..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="text-lg"/>
+        <div className="space-y-4">
+            <div className="space-y-2">
+                <Input placeholder="Search for a license plate..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="text-base" />
                 <div className="flex flex-wrap items-center gap-2">
-                    <Input className="flex-auto min-w-[120px]" placeholder="Make" value={filters.make} onChange={e => setFilters({...filters, make: e.target.value})} />
-                    <Input className="flex-auto min-w-[120px]" placeholder="Color" value={filters.color} onChange={e => setFilters({...filters, color: e.target.value})} />
-                    <Input className="w-28" type="number" placeholder="Year" value={filters.year} onChange={e => setFilters({...filters, year: e.target.value})} />
-                    <div className="w-40">
-                        <Select onValueChange={(value) => handleSelectFilterChange('mot', value)} defaultValue={searchParams.get('mot') || 'all'}><SelectTrigger><SelectValue placeholder="All MOT Statuses" /></SelectTrigger><SelectContent><SelectItem value="all">All MOT</SelectItem><SelectItem value="Valid">Valid</SelectItem><SelectItem value="Expired">Expired</SelectItem></SelectContent></Select>
-                    </div>
-                    <div className="w-40">
-                        <Select onValueChange={(value) => handleSelectFilterChange('tax', value)} defaultValue={searchParams.get('tax') || 'all'}><SelectTrigger><SelectValue placeholder="All Tax Statuses" /></SelectTrigger><SelectContent><SelectItem value="all">All Tax</SelectItem><SelectItem value="Taxed">Taxed</SelectItem><SelectItem value="Not Taxed">Not Taxed</SelectItem></SelectContent></Select>
-                    </div>
+                    <Select value={filters.make} onValueChange={(v) => setFilters(f => ({...f, make: v}))}>
+                        <SelectTrigger className="flex-1 min-w-[120px]"><SelectValue placeholder="All Makes" /></SelectTrigger>
+                        <SelectContent><SelectItem value="all">All Makes</SelectItem>{filterOptions.makes.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
+                    </Select>
+                    <Select value={filters.color} onValueChange={(v) => setFilters(f => ({...f, color: v}))}>
+                        <SelectTrigger className="flex-1 min-w-[120px]"><SelectValue placeholder="All Colors" /></SelectTrigger>
+                        <SelectContent><SelectItem value="all">All Colors</SelectItem>{filterOptions.colors.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                    </Select>
+                    <Select value={filters.year} onValueChange={(v) => setFilters(f => ({...f, year: v}))}>
+                        <SelectTrigger className="w-full md:w-auto min-w-[120px]"><SelectValue placeholder="All Years" /></SelectTrigger>
+                        <SelectContent><SelectItem value="all">All Years</SelectItem>{filterOptions.years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+                    </Select>
+                    <Select value={filters.mot} onValueChange={(v) => setFilters(f => ({...f, mot: v}))}>
+                        <SelectTrigger className="w-full md:w-auto min-w-[140px]"><SelectValue placeholder="All MOT" /></SelectTrigger>
+                        <SelectContent><SelectItem value="all">All MOT</SelectItem><SelectItem value="Valid">Valid</SelectItem><SelectItem value="Expired">Expired</SelectItem></SelectContent>
+                    </Select>
+                    <Select value={filters.tax} onValueChange={(v) => setFilters(f => ({...f, tax: v}))}>
+                        <SelectTrigger className="w-full md:w-auto min-w-[140px]"><SelectValue placeholder="All Tax" /></SelectTrigger>
+                        <SelectContent><SelectItem value="all">All Tax</SelectItem><SelectItem value="Taxed">Taxed</SelectItem><SelectItem value="Not Taxed">Not Taxed</SelectItem></SelectContent>
+                    </Select>
                     <div className="flex gap-2 ml-auto">
-                        <Button onClick={handleApplyTextFilters}>Apply</Button>
+                        <Button onClick={handleApplyFilters}>Apply Filters</Button>
                         <Button onClick={handleClearFilters} variant="ghost">Clear</Button>
                     </div>
                 </div>
             </div>
 
-            <div className="border rounded-lg overflow-x-auto">
+            <div className="rounded-lg border">
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-[150px]">Image</TableHead>
+                            <TableHead className="w-[120px]">Image</TableHead>
                             <TableHead>Plate</TableHead>
                             <TableHead>Vehicle Details</TableHead>
                             <TableHead>MOT</TableHead>
                             <TableHead>Tax</TableHead>
                             <TableHead>Registration</TableHead>
-                            <TableHead>Last Seen</TableHead>
+                            <TableHead className="text-left">Last Seen</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -135,62 +141,44 @@ export function PlatesTable({ apiData }: PlatesApiResponse) {
                             plates.map((plate) => (
                                 <TableRow key={plate.id}>
                                     <TableCell>
-                                        {plate.image_url ? (
-                                            <img src={plate.image_url} alt={`Capture of ${plate.plate_number}`} className="min-w-[140px] h-auto rounded-md object-cover"/>
-                                        ) : (
-                                            <div className="w-full h-20 bg-muted rounded-md flex items-center justify-center text-xs text-muted-foreground">No Image</div>
-                                        )}
+                                        {plate.image_url ? (<img src={plate.image_url} alt={`Capture of ${plate.plate_number}`} className="w-28 h-auto rounded-md object-cover"/>) : (<div className="w-28 h-16 bg-muted rounded-md"/>)}
                                     </TableCell>
                                     <TableCell className="align-middle">
-                                        <div className={styles.plateStyle}>
-                                            {formatPlate(plate.plate_number)}
-                                        </div>
+                                        <div className={styles.plateStyle}>{formatPlate(plate.plate_number)}</div>
                                     </TableCell>
-                                    <TableCell className="align-top pt-4">
-                                        <div className="font-medium">{plate.car_make || 'N/A'}</div>
-                                        <div className="text-sm text-muted-foreground">
-                                            {plate.car_color || 'N/A'} • {plate.fuel_type || 'N/A'}
-                                        </div>
+                                    <TableCell className="align-top pt-3">
+                                        <div className="font-semibold">{plate.car_make || 'N/A'}</div>
+                                        <div className="text-sm text-muted-foreground">{plate.car_color || 'N/A'} • {plate.fuel_type || 'N/A'}</div>
                                     </TableCell>
-                                    <TableCell className="align-top pt-4">
-                                        <div className={cn(styles.badge, getStatusClass(plate.mot_status))}>
-                                            {plate.mot_status || 'N/A'}
-                                        </div>
+                                    <TableCell className="align-top pt-3">
+                                        <div className={cn(styles.badge, getStatusClass(plate.mot_status))}>{plate.mot_status || 'N/A'}</div>
                                         {plate.mot_expiry_date && <div className="text-xs text-muted-foreground mt-1">Expires {dayjs(plate.mot_expiry_date).format('DD/MM/YYYY')}</div>}
                                     </TableCell>
-                                    <TableCell className="align-top pt-4">
-                                        <div className={cn(styles.badge, getStatusClass(plate.tax_status))}>
-                                            {plate.tax_status || 'N/A'}
-                                        </div>
+                                    <TableCell className="align-top pt-3">
+                                        <div className={cn(styles.badge, getStatusClass(plate.tax_status))}>{plate.tax_status || 'N/A'}</div>
                                         {plate.tax_due_date && <div className="text-xs text-muted-foreground mt-1">Due {dayjs(plate.tax_due_date).format('DD/MM/YYYY')}</div>}
                                     </TableCell>
-                                    <TableCell className="align-top pt-4">
-                                        <div className="font-medium">{plate.year_of_manufacture || 'N/A'}</div>
+                                    <TableCell className="align-top pt-3">
+                                        <div className="font-semibold">{plate.year_of_manufacture || 'N/A'}</div>
                                         <div className="text-sm text-muted-foreground">{plate.month_of_first_registration ? `Reg: ${dayjs(plate.month_of_first_registration).format('MMM YYYY')}` : 'N/A'}</div>
                                     </TableCell>
-                                    <TableCell className="text-right align-top pt-4">
-                                        <div className="text-sm font-medium">{dayjs(plate.recent_capture_time).fromNow()}</div>
+                                    <TableCell className="text-left align-top pt-3">
+                                        <div className="font-semibold">{dayjs(plate.recent_capture_time).fromNow()}</div>
                                         <div className="text-xs text-muted-foreground">{dayjs(plate.recent_capture_time).format('DD/MM/YY HH:mm')}</div>
                                     </TableCell>
                                 </TableRow>
                             ))
                         ) : (
-                            <TableRow>
-                                <TableCell colSpan={7} className="h-24 text-center">
-                                    No results found.
-                                </TableCell>
-                            </TableRow>
+                            <TableRow><TableCell colSpan={7} className="h-24 text-center">No results found.</TableCell></TableRow>
                         )}
                     </TableBody>
                 </Table>
             </div>
-
-            <div className="py-4">
-                <DataPagination
-                    currentPage={pagination.currentPage}
-                    totalPages={pagination.totalPages}
-                />
-            </div>
-        </>
+            {pagination.totalPages > 1 && (
+                <div className="flex justify-center mt-4">
+                    <DataPagination currentPage={pagination.currentPage} totalPages={pagination.totalPages} />
+                </div>
+            )}
+        </div>
     );
 }
