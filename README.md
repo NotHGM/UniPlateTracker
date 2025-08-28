@@ -1,19 +1,15 @@
 # UniPlateTracker
 
-**UniPlateTracker** is a robust, self-hosted license plate recognition and tracking dashboard. It is designed for prosumer and enterprise use, providing a secure and scalable solution for monitoring vehicle activity from RTSP-enabled cameras via Home Assistant.
+**UniPlateTracker** is a robust, self-hosted license plate recognition and tracking dashboard. It is designed for prosumer and enterprise use, providing a secure and scalable solution for monitoring vehicle activity directly from a UniFi Protect camera system.
+
+This application uses a real-time, event-driven architecture. A dedicated background worker listens for webhook notifications directly from a UniFi Protect NVR. When a license plate is detected, the worker processes the event, saves the included `base64` thumbnail image directly into a PostgreSQL database, and logs the event details. The data is then presented in a clean, modern web interface built with Next.js.
 
 ---
 
-## 📋 Project Overview
-
-This application bridges the gap between smart home platforms and professional-grade monitoring. It polls a Home Assistant sensor (updated by a camera integration like UniFi Protect) for license plate detections. When a plate is detected, a dedicated background worker captures a high-quality image from the camera's live stream and logs the event in a PostgreSQL database.
-
-The data is then presented in a clean, modern web interface built with Next.js, featuring server-side rendering for performance and a fully interactive data table.
-
 ## ✨ Key Features
 
-- **Real-time Polling:** A dedicated background service continuously polls Home Assistant for new license plate data.
-- **On-Demand Image Capture:** Captures a high-resolution snapshot from any RTSP stream at the moment of detection.
+- **Real-Time Webhook Processing:** A dedicated background service instantly receives LPR (License Plate Recognition) events from UniFi Protect.
+- **Self-Contained Image Storage:** Decodes `base64` thumbnails from the webhook payload and stores them directly in the database, requiring no server file system storage.
 - **Modern Web Dashboard:** A fast and responsive web UI built with Next.js and shadcn/ui.
 - **Server-Driven UI:** Utilizes React Server Components for optimal performance and data fetching.
 - **Paginated Data Table:** Efficiently handles large datasets with server-side pagination.
@@ -22,15 +18,13 @@ The data is then presented in a clean, modern web interface built with Next.js, 
 
 ## 🛠️ Tech Stack
 
-- **Framework:** Next.js 15 (App Router)
+- **Framework:** Next.js (App Router, Turbopack)
 - **Language:** TypeScript
-- **Backend:** Next.js API Routes & a standalone Node.js Worker Service
+- **Backend:** Next.js API Routes & a standalone Node.js Worker Service (using Express.js)
 - **Database:** PostgreSQL
 - **UI:** React, Tailwind CSS, shadcn/ui
 - **Data Validation:** Zod
-- **Core Integrations:**
-    - Home Assistant (for sensor data)
-    - FFmpeg (for RTSP image capture)
+- **Core Integration:** UniFi Protect (via LPR Webhooks)
 
 ---
 
@@ -40,13 +34,10 @@ Follow these instructions to get a development environment up and running.
 
 ### Prerequisites
 
-You must have the following installed and configured on your system:
-
-- [Node.js](https://nodejs.org/) (v18 or later)
-- [npm](https://www.npmjs.com/) (or your preferred package manager)
+- [Node.js](https://nodejs.org/) (v20.x or later is highly recommended)
+- [npm](https://www.npmjs.com/) or your preferred package manager
 - [PostgreSQL](https://www.postgresql.org/) Database Server
-- [FFmpeg](https://ffmpeg.org/download.html) (must be accessible in your system's PATH)
-- A running [Home Assistant](https://www.home-assistant.io/) instance with a configured camera integration that provides a license plate sensor.
+- A running UniFi Protect NVR (UDM Pro, UNVR, etc.) with at least one camera capable of LPR.
 
 ### Installation & Setup
 
@@ -61,12 +52,12 @@ You must have the following installed and configured on your system:
     ```bash
     cp .env.example .env.local
     ```
-    Now, open `.env.local` and **fill in all the required values** (database URL, Home Assistant details, etc.). See the table below for a description of each variable.
+    Now, open `.env.local` and fill in all the required values.
 
 3.  **Install Dependencies:**
-    Install dependencies for both the main Next.js app and the background worker.
+    This project uses a monorepo-like structure with a separate `worker` directory.
     ```bash
-    # Install root dependencies
+    # Install root dependencies for the Next.js app
     npm install
 
     # Install worker dependencies
@@ -76,13 +67,22 @@ You must have the following installed and configured on your system:
     ```
 
 4.  **Set Up the Database:**
-    Run the database migration scripts to create the necessary tables and columns.
+    Run the database migration scripts in order to create and configure the `license_plates` table.
     ```bash
     npx ts-node --require dotenv/config scripts/001-create-initial-tables.ts
-    npx ts-node --require dotenv/config scripts/002-add-image-url-column.ts
+    npx ts-node --require dotenv/config scripts/004-change-image-column-to-text.ts
     ```
 
-5.  **Run the Application:**
+5.  **Configure UniFi Protect Webhook:**
+    - In your UniFi Protect dashboard, go to the **System Log > Alarms**.
+    - Create a **New Alarm**.
+    - **Trigger:** Select the **ID** tab, then the **LPR** sub-tab. Check "Unknown Vehicles" and "Known Vehicles".
+    - **Scope:** Select the camera(s) you want to monitor.
+    - **Action:** Select **Webhook**.
+        - **Delivery URL:** `http://[IP_OF_YOUR_SERVER]:[WORKER_PORT]/webhook` (e.g., `http://192.168.1.177:4000/webhook`)
+        - Click **Advanced Settings** and ensure the **Method** is set to **POST**.
+
+6.  **Run the Application:**
     Start the entire application (Next.js web server and background worker) with a single command.
     ```bash
     npm run dev
@@ -95,17 +95,12 @@ You must have the following installed and configured on your system:
 
 The following variables must be set in your `.env.local` file for the application to function.
 
-| Variable                      | Description                                                                                              | Example                                                        |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `POSTGRES_URL`                | The full connection string for your PostgreSQL database.                                                 | `postgresql://user:pass@host:5432/dbname`                      |
-| `NEXTAUTH_SECRET`             | A strong, random secret for signing authentication tokens (future use).                                  | `your-super-strong-random-secret`                              |
-| `NEXTAUTH_URL`                | The canonical URL of your web application.                                                               | `http://localhost:3000`                                        |
-| `HOME_ASSISTANT_URL`          | The URL for your Home Assistant instance.                                                                | `http://192.168.1.100:8123`                                    |
-| `LONG_LIVED_ACCESS_TOKEN`     | The Long-Lived Access Token generated from your Home Assistant profile.                                  | `ey...`                                                        |
-| `HOME_ASSISTANT_SENSOR_NAME`  | The Entity ID of the Home Assistant sensor that holds the last seen license plate.                       | `input_text.last_license_plate`                                |
-| `RTSP_URL`                    | The full RTSP URL for your camera's live stream.                                                         | `rtsp://user:pass@192.168.1.20/stream1`                          |
-| `ENABLE_VIDEO_CAPTURE`        | Set to `true` to enable video capture (future feature).                                                  | `true`                                                         |
-| `BACKGROUND_TASK_POLL_RATE`   | The interval in milliseconds for the worker to poll Home Assistant.                                      | `10000` (for 10 seconds)                                       |
+| Variable          | Description                                                               | Example                                     |
+| ----------------- | ------------------------------------------------------------------------- | ------------------------------------------- |
+| `POSTGRES_URL`    | The full connection string for your PostgreSQL database.                  | `postgresql://user:pass@host:5432/dbname`   |
+| `WORKER_PORT`     | The network port for the webhook worker service to listen on.             | `4000`                                      |
+| `NEXTAUTH_URL`    | The canonical URL of your web application.                                | `http://localhost:3000`                     |
+| `NEXTAUTH_SECRET` | A strong, random secret for signing authentication tokens (for future use). | `generate-with-openssl-rand-base64-32`      |
 
 
 ## 🗺️ Future Roadmap
@@ -113,5 +108,4 @@ The following variables must be set in your `.env.local` file for the applicatio
 - [ ] **DVLA Integration:** Fetch vehicle details (make, color, tax status) from the DVLA API.
 - [ ] **User Authentication:** Implement user logins and role-based access control with NextAuth.js.
 - [ ] **Advanced Filtering & Search:** Add UI controls to filter the data table by make, color, date, etc.
-- [ ] **Video Snippet Capture:** Implement the functionality to save short video clips on detection.
 - [ ] **Dashboard Analytics:** Add charts and graphs to visualize detection trends over time.
