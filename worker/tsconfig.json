@@ -1,21 +1,8 @@
 {
   "compilerOptions": {
-    // --- Core Settings for a Node.js Worker ---
-    "target": "es2020",
-    "module": "commonjs",
-    "outDir": "../dist/worker",
-    "types": ["node"], // This is the most important fix
-
-    // --- Recommended Best Practices ---
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "target": "es2020", "module": "commonjs", "outDir": "../dist/worker",
+    "types": ["node"], "strict": true, "esModuleInterop": true,
+    "skipLibCheck": true, "forceConsistentCasingInFileNames": true
   },
-  "include": [
-    "src/**/*" // Ensure we only compile files from the src directory
-  ],
-  "exclude": [
-    "node_modules"
-  ]
+  "include": ["src/**/*"], "exclude": ["node_modules"]
 }

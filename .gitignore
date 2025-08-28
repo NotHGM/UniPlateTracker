@@ -54,3 +54,7 @@ pnpm-debug.log*
 *.pem
 # Deployment-specific files (Vercel, etc.)
 .vercel/
+
+# Misc
+._uniplatetracker
+/uniplatetracker

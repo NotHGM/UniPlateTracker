@@ -1,8 +1,6 @@
+import express = require('express');
 const { Pool } = require('pg');
-const axios = require('axios');
 const path = require('path');
-const fs = require('fs');
-const ffmpeg = require('fluent-ffmpeg');
 const dotenv = require('dotenv');
 
 // --- Configuration ---
@@ -10,127 +8,64 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env.local') });
 
 const {
     POSTGRES_URL,
-    HOME_ASSISTANT_URL,
-    LONG_LIVED_ACCESS_TOKEN,
-    HOME_ASSISTANT_SENSOR_NAME,
-    RTSP_URL,
-    BACKGROUND_TASK_POLL_RATE
+    WORKER_PORT
 } = process.env;
 
-if (!POSTGRES_URL || !HOME_ASSISTANT_URL || !LONG_LIVED_ACCESS_TOKEN || !HOME_ASSISTANT_SENSOR_NAME || !RTSP_URL) {
-    console.error("FATAL: Missing required environment variables for the worker service.");
+if (!POSTGRES_URL || !WORKER_PORT) {
+    console.error("FATAL: Missing POSTGRES_URL or WORKER_PORT in .env.local.");
     process.exit(1);
 }
 
-const pollRate = parseInt(BACKGROUND_TASK_POLL_RATE || '10000', 10);
+const port = parseInt(WORKER_PORT, 10);
 const pool = new Pool({ connectionString: POSTGRES_URL });
 
-const CAPTURES_DIR = path.resolve(__dirname, '../../public/captures');
-if (!fs.existsSync(CAPTURES_DIR)) {
-    fs.mkdirSync(CAPTURES_DIR, { recursive: true });
-}
-
-// --- Core Functions ---
-
-async function fetchLatestPlate(): Promise<string | null> {
-    const url = `${HOME_ASSISTANT_URL}/api/states/${HOME_ASSISTANT_SENSOR_NAME}`;
-    const headers = { 'Authorization': `Bearer ${LONG_LIVED_ACCESS_TOKEN}` };
-    try {
-        const response = await axios.get(url, { headers, timeout: 5000 });
-        const plate = response.data?.state;
-        if (plate && plate !== 'unknown' && plate !== 'none') {
-            return plate.toUpperCase();
-        }
-    } catch (error) {
-        // This is the safe way to handle unknown errors in TypeScript
-        if (error instanceof Error) {
-            console.error('Error fetching from Home Assistant:', error.message);
-        } else {
-            console.error('An unknown error occurred while fetching from Home Assistant.');
-        }
-    }
-    return null;
-}
-
-function captureImage(licensePlate: string): Promise<string | null> {
-    return new Promise((resolve) => {
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const filename = `${licensePlate}_${timestamp}.jpg`;
-        const outputPath = path.join(CAPTURES_DIR, filename);
-
-        console.log(`[${licensePlate}] Capturing image from stream...`);
-
-        ffmpeg(RTSP_URL)
-            .setFfmpegPath('ffmpeg')
-            .outputOptions(['-vframes 1', '-q:v 2', '-f image2'])
-            .save(outputPath)
-            .on('end', () => {
-                console.log(`[${licensePlate}] Image saved: ${filename}`);
-                resolve(`/captures/${filename}`);
-            })
-            // Explicitly type the error parameter to satisfy strict TypeScript rules
-            .on('error', (err: Error) => {
-                console.error(`[${licensePlate}] FFMPEG Error: ${err.message}`);
-                resolve(null);
-            });
-    });
-}
-
-async function processPlateData(plateNumber: string) {
+// --- Database Logic ---
+async function processPlateData(plateNumber: string, thumbnailBase64: string | undefined) {
     const client = await pool.connect();
     try {
-        const imageUrl = await captureImage(plateNumber);
-
-        const existingPlate = await client.query('SELECT id FROM license_plates WHERE plate_number = $1', [plateNumber]);
         const captureTime = new Date();
+        const existingPlate = await client.query('SELECT id FROM license_plates WHERE plate_number = $1', [plateNumber]);
 
         if (existingPlate.rows.length > 0) {
             const plateId = existingPlate.rows[0].id;
-            await client.query(
-                'UPDATE license_plates SET recent_capture_time = $1, image_url = $2, updated_at = NOW() WHERE id = $3',
-                [captureTime, imageUrl, plateId]
-            );
-            console.log(`[${plateNumber}] Updated existing record.`);
+            // Update the record with the new time and the raw base64 thumbnail string.
+            await client.query('UPDATE license_plates SET recent_capture_time = $1, image_url = $2, updated_at = NOW() WHERE id = $3', [captureTime, thumbnailBase64, plateId]);
+            console.log(`[${plateNumber}] Updated record in database with new thumbnail.`);
         } else {
-            await client.query(
-                `INSERT INTO license_plates (plate_number, capture_time, recent_capture_time, image_url)
-                 VALUES ($1, $2, $3, $4)`,
-                [plateNumber, captureTime, captureTime, imageUrl]
-            );
-            console.log(`[${plateNumber}] Created new record in database.`);
+            // Create a new record, storing the raw base64 thumbnail string.
+            await client.query(`INSERT INTO license_plates (plate_number, capture_time, recent_capture_time, image_url) VALUES ($1, $2, $3, $4)`, [plateNumber, captureTime, captureTime, thumbnailBase64]);
+            console.log(`[${plateNumber}] Created new record in database with thumbnail.`);
         }
     } catch (error) {
-        if (error instanceof Error) {
-            console.error(`[${plateNumber}] Database Error:`, error.message);
-        } else {
-            console.error(`[${plateNumber}] An unknown database error occurred.`);
-        }
+        if (error instanceof Error) { console.error(`[${plateNumber}] Database Error:`, error.message); }
     } finally {
         client.release();
     }
 }
 
-// --- Main Polling Loop ---
-let lastProcessedPlate: string | null = null;
-let lastProcessTime: number = 0;
+// --- Webhook Server ---
+const app = express();
+app.use(express.json({ limit: '10mb' }));
 
-async function mainLoop() {
-    const currentPlate = await fetchLatestPlate();
-    if (!currentPlate) return;
+app.post('/webhook', (req: express.Request, res: express.Response) => {
+    const payload = req.body;
+    console.log(`\n--- LPR Webhook Received ---`);
 
-    const now = Date.now();
-    const isNewPlate = currentPlate !== lastProcessedPlate;
-    const isCooldownOver = (now - lastProcessTime) > 30000;
+    const trigger = payload?.alarm?.triggers?.[0];
+    const thumbnail = payload?.alarm?.thumbnail; // The full "data:image/jpeg;base64,..." string
+    const plateNumber = trigger?.value;
 
-    if (isNewPlate || isCooldownOver) {
-        console.log(`\n--- New Detection: ${currentPlate} ---`);
-        await processPlateData(currentPlate);
-        lastProcessedPlate = currentPlate;
-        lastProcessTime = now;
+    if (plateNumber) {
+        const sanitizedPlate = plateNumber.toUpperCase().replace(/\s/g, '');
+        console.log(`SUCCESS: Extracted Plate: ${sanitizedPlate}`);
+        // Pass the raw base64 string directly to the processing function.
+        processPlateData(sanitizedPlate, thumbnail);
+    } else {
+        console.warn("Webhook received, but no plate data was not found.");
     }
-}
+    res.status(200).send('Webhook received and acknowledged.');
+});
 
-// --- Start the Service ---
-console.log("Starting UniPlateTracker Worker Service...");
-console.log("Polling Home Assistant every", pollRate / 1000, "seconds.");
-setInterval(mainLoop, pollRate);
+app.listen(port, () => {
+    console.log(`Worker listening for UniFi Protect LPR webhooks on port ${port}`);
+});

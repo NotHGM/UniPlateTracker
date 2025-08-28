@@ -31,22 +31,17 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   let fetchError: string | null = null;
 
   if (!baseUrl) {
-    fetchError = "Configuration error: NEXTAUTH_URL is not set in your environment variables.";
+    fetchError = "Configuration error: NEXTAUTH_URL is not set.";
   } else {
     try {
       const response = await fetch(`${baseUrl}/api/plates?page=${currentPage}`, {
         cache: 'no-store',
       });
-
-      if (!response.ok) {
-        throw new Error(`API responded with status ${response.status}`);
-      }
-
+      if (!response.ok) throw new Error(`API responded with ${response.status}`);
       apiData = await response.json();
-
     } catch (error) {
       console.error("Failed to fetch plates:", error);
-      fetchError = "Could not connect to the API. The backend service might be down.";
+      fetchError = "Could not connect to the API service.";
     }
   }
 
@@ -74,6 +69,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                     <Table>
                       <TableHeader>
                         <TableRow>
+                          {/* Add a new column for the image */}
+                          <TableHead className="w-[150px]">Image</TableHead>
                           <TableHead>Number Plate</TableHead>
                           <TableHead>Make & Color</TableHead>
                           <TableHead className="text-right">Last Seen</TableHead>
@@ -83,6 +80,20 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                         {plates.length > 0 ? (
                             plates.map((plate: LicensePlate) => (
                                 <TableRow key={plate.id}>
+                                  {/* Render the image directly from the base64 string */}
+                                  <TableCell>
+                                    {plate.image_url ? (
+                                        <img
+                                            src={plate.image_url}
+                                            alt={`Capture of ${plate.plate_number}`}
+                                            className="w-full h-auto rounded-md object-cover"
+                                        />
+                                    ) : (
+                                        <div className="w-full h-16 bg-muted rounded-md flex items-center justify-center text-xs text-muted-foreground">
+                                          No Image
+                                        </div>
+                                    )}
+                                  </TableCell>
                                   <TableCell className="font-medium">{plate.plate_number}</TableCell>
                                   <TableCell>{plate.car_make || 'N/A'} - {plate.car_color || 'N/A'}</TableCell>
                                   <TableCell className="text-right">
@@ -92,7 +103,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                             ))
                         ) : (
                             <TableRow>
-                              <TableCell colSpan={3} className="h-24 text-center">
+                              <TableCell colSpan={4} className="h-24 text-center">
                                 No data available. Waiting for the first plate detection.
                               </TableCell>
                             </TableRow>
