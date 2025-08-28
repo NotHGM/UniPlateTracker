@@ -1,16 +1,14 @@
 /* src/components/app/plates.module.css */
-
-/* --- Authentic UK License Plate Style --- */
 .plateStyle {
     font-family: var(--font-charles-wright);
-    background-color: #FACC15; /* Official plate yellow */
-    color: #111827; /* Near-black for text */
-    padding: 0.2rem 1rem;
-    border-radius: 0.3rem;
-    border: 2px solid #374151; /* Dark grey border */
-    display: inline-flex; /* Use flex for spacing */
+    background-color: #FBBF24;
+    color: #111827;
+    padding: 0.3rem 0.8rem;
+    border-radius: 0.375rem;
+    border: 2px solid #374151;
+    display: inline-flex;
     align-items: center;
-    gap: 0.5em; /* This creates the space in the middle */
+    gap: 0.5em;
     text-transform: uppercase;
     font-weight: 700;
     font-size: 1.1rem;
@@ -23,32 +21,28 @@
     transform: scale(1.02);
 }
 
-/* --- Base styles for all status badges --- */
 .badge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 0.15rem 0.6rem;
-    border-radius: 9999px; /* Pill shape */
+    padding: 0.15rem 0.75rem;
+    border-radius: 9999px;
     font-weight: 600;
     font-size: 0.75rem;
+    min-width: 130px;
     border: 1px solid transparent;
-    min-width: 60px; /* Ensures N/A badges have a nice width */
 }
 
-/* --- Modifier class for Success (Valid, Taxed) --- */
 .badgeSuccess {
     background-color: var(--success);
     color: var(--success-foreground);
 }
 
-/* --- Modifier class for Destructive (Expired, Not Taxed) --- */
 .badgeDestructive {
     background-color: var(--destructive);
-    color: var(--primary-foreground); /* Your theme uses this for text on dark backgrounds */
+    color: var(--destructive-foreground);
 }
 
-/* --- Modifier class for Neutral (N/A) --- */
 .badgeSecondary {
     background-color: var(--secondary);
     color: var(--secondary-foreground);

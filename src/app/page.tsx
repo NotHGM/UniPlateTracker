@@ -3,31 +3,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { PlatesApiResponse } from "@/lib/types";
 import { PlatesTable } from "@/components/app/plates-table";
+import { ModeToggle } from "@/components/mode-toggle";
 
-// Update props to include all possible filters from your API
 interface HomePageProps {
-  searchParams: {
-    page?: string;
-    make?: string;
-    color?: string;
-    year?: string;
-    fuelType?: string;
-    tax?: string;
-    mot?: string;
-  };
+  searchParams: { [key: string]: string | string[] | undefined };
 }
 
 export default async function HomePage({ searchParams }: HomePageProps) {
-  // Convert searchParams object to a query string, filtering out undefined values
-  const query = new URLSearchParams(
-      Object.entries(searchParams).reduce((acc, [key, value]) => {
-        if (value) acc[key] = value;
-        return acc;
-      }, {} as Record<string, string>)
-  ).toString();
+  const query = new URLSearchParams();
+  Object.entries(searchParams).forEach(([key, value]) => {
+    if (typeof value === 'string') {
+      query.append(key, value);
+    } else if (Array.isArray(value)) {
+      value.forEach(v => query.append(key, v));
+    }
+  });
 
   const baseUrl = process.env.NEXTAUTH_URL;
-
   let apiData: PlatesApiResponse | null = null;
   let fetchError: string | null = null;
 
@@ -35,8 +27,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     fetchError = "Configuration error: NEXTAUTH_URL is not set.";
   } else {
     try {
-      const response = await fetch(`${baseUrl}/api/plates?${query}`, {
-        cache: 'no-store', // Important for dynamic data
+      const response = await fetch(`${baseUrl}/api/plates?${query.toString()}`, {
+        cache: 'no-store',
       });
       if (!response.ok) throw new Error(`API responded with ${response.status}`);
       apiData = await response.json();
@@ -48,24 +40,28 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
   return (
       <main className="container mx-auto p-4 md:p-8">
-        <Card>
-          <CardHeader>
-            <CardTitle>UniPlateTracker</CardTitle>
-            <CardDescription>
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <h1 className="text-2xl font-bold">UniPlateTracker</h1>
+            <p className="text-muted-foreground">
               A centralized dashboard for license plate monitoring.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {fetchError ? (
+            </p>
+          </div>
+          <ModeToggle />
+        </div>
+
+        {fetchError ? (
+            <Card>
+              <CardContent className="pt-6">
                 <Alert variant="destructive">
                   <AlertTitle>Error</AlertTitle>
                   <AlertDescription>{fetchError}</AlertDescription>
                 </Alert>
-            ) : (
-                <PlatesTable apiData={apiData} />
-            )}
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+        ) : (
+            <PlatesTable apiData={apiData} />
+        )}
       </main>
   );
 }

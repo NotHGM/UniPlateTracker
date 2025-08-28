@@ -1,7 +1,7 @@
 // src/components/app/plates-table.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { LicensePlate, PlatesApiResponse } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -20,17 +20,12 @@ interface PlatesTableProps {
     apiData: PlatesApiResponse | null;
 }
 
-// Function to format the plate with a space
 const formatPlate = (plate: string | null): JSX.Element => {
     if (!plate) return <>{'N/A'}</>;
-    // Standard UK format is 7 chars. Split after the 4th.
-    if (plate.length === 7) {
-        return (
-            <>
-                <span>{plate.substring(0, 4)}</span>
-                <span>{plate.substring(4)}</span>
-            </>
-        );
+    if (plate.length >= 7) {
+        const firstPart = plate.substring(0, 4);
+        const secondPart = plate.substring(4);
+        return <><span>{firstPart}</span><span>{secondPart}</span></>;
     }
     return <span>{plate}</span>;
 };
@@ -38,12 +33,8 @@ const formatPlate = (plate: string | null): JSX.Element => {
 const getStatusClass = (status: string | null): string => {
     if (!status) return styles.badgeSecondary;
     const lowerStatus = status.toLowerCase();
-    if (lowerStatus === 'valid' || lowerStatus === 'taxed') {
-        return styles.badgeSuccess;
-    }
-    if (lowerStatus.includes('expire') || lowerStatus.includes('due') || lowerStatus.includes('not taxed')) {
-        return styles.badgeDestructive;
-    }
+    if (lowerStatus === 'valid' || lowerStatus === 'taxed') return styles.badgeSuccess;
+    if (lowerStatus.includes('expire') || lowerStatus.includes('due') || lowerStatus.includes('not taxed')) return styles.badgeDestructive;
     return styles.badgeSecondary;
 };
 
@@ -52,6 +43,7 @@ export function PlatesTable({ apiData }: PlatesApiResponse) {
     const pathname = usePathname();
     const searchParams = useSearchParams();
 
+    const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
     const [filters, setFilters] = useState({
         make: searchParams.get('make') || '',
         color: searchParams.get('color') || '',
@@ -61,7 +53,28 @@ export function PlatesTable({ apiData }: PlatesApiResponse) {
     const plates = apiData?.data ?? [];
     const pagination = apiData?.pagination ?? { currentPage: 1, totalPages: 0 };
 
-    const handleApplyFilters = () => {
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            const current = new URLSearchParams(Array.from(searchParams.entries()));
+            if (searchTerm) {
+                current.set("search", searchTerm);
+            } else {
+                current.delete("search");
+            }
+            // Preserve other filters when searching
+            Object.entries(filters).forEach(([key, value]) => {
+                if (value) current.set(key, value);
+                else current.delete(key);
+            });
+            current.set("page", "1");
+            router.push(`${pathname}?${current.toString()}`);
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, [searchTerm, pathname, router, filters]);
+
+
+    const handleApplyTextFilters = () => {
         const current = new URLSearchParams(Array.from(searchParams.entries()));
         for (const [key, value] of Object.entries(filters)) {
             if (value) current.set(key, value);
@@ -85,34 +98,22 @@ export function PlatesTable({ apiData }: PlatesApiResponse) {
 
     return (
         <>
-            {/* --- CORRECTED Filter Section Layout --- */}
-            <div className="flex flex-wrap items-center gap-2 md:gap-4 mb-4">
-                <Input className="flex-auto min-w-[150px]" placeholder="Make (e.g., AUDI)" value={filters.make} onChange={e => setFilters({...filters, make: e.target.value.toUpperCase()})} />
-                <Input className="flex-auto min-w-[150px]" placeholder="Color (e.g., BLACK)" value={filters.color} onChange={e => setFilters({...filters, color: e.target.value.toUpperCase()})} />
-                <Input className="w-32" type="number" placeholder="Year (e.g., 2009)" value={filters.year} onChange={e => setFilters({...filters, year: e.target.value})} />
-                <div className="w-48">
-                    <Select onValueChange={(value) => handleSelectFilterChange('mot', value)} defaultValue={searchParams.get('mot') || 'all'}>
-                        <SelectTrigger><SelectValue placeholder="All MOT Statuses" /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All MOT Statuses</SelectItem>
-                            <SelectItem value="Valid">Valid</SelectItem>
-                            <SelectItem value="Expired">Expired</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div className="w-48">
-                    <Select onValueChange={(value) => handleSelectFilterChange('tax', value)} defaultValue={searchParams.get('tax') || 'all'}>
-                        <SelectTrigger><SelectValue placeholder="All Tax Statuses" /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Tax Statuses</SelectItem>
-                            <SelectItem value="Taxed">Taxed</SelectItem>
-                            <SelectItem value="Not Taxed">Not Taxed</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div className="flex gap-2 ml-auto">
-                    <Button onClick={handleApplyFilters}>Apply Filters</Button>
-                    <Button onClick={handleClearFilters} variant="outline">Clear</Button>
+            <div className="space-y-4 mb-4 p-4 border rounded-lg bg-card">
+                <Input placeholder="Search for a license plate..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="text-lg"/>
+                <div className="flex flex-wrap items-center gap-2">
+                    <Input className="flex-auto min-w-[120px]" placeholder="Make" value={filters.make} onChange={e => setFilters({...filters, make: e.target.value})} />
+                    <Input className="flex-auto min-w-[120px]" placeholder="Color" value={filters.color} onChange={e => setFilters({...filters, color: e.target.value})} />
+                    <Input className="w-28" type="number" placeholder="Year" value={filters.year} onChange={e => setFilters({...filters, year: e.target.value})} />
+                    <div className="w-40">
+                        <Select onValueChange={(value) => handleSelectFilterChange('mot', value)} defaultValue={searchParams.get('mot') || 'all'}><SelectTrigger><SelectValue placeholder="All MOT Statuses" /></SelectTrigger><SelectContent><SelectItem value="all">All MOT</SelectItem><SelectItem value="Valid">Valid</SelectItem><SelectItem value="Expired">Expired</SelectItem></SelectContent></Select>
+                    </div>
+                    <div className="w-40">
+                        <Select onValueChange={(value) => handleSelectFilterChange('tax', value)} defaultValue={searchParams.get('tax') || 'all'}><SelectTrigger><SelectValue placeholder="All Tax Statuses" /></SelectTrigger><SelectContent><SelectItem value="all">All Tax</SelectItem><SelectItem value="Taxed">Taxed</SelectItem><SelectItem value="Not Taxed">Not Taxed</SelectItem></SelectContent></Select>
+                    </div>
+                    <div className="flex gap-2 ml-auto">
+                        <Button onClick={handleApplyTextFilters}>Apply</Button>
+                        <Button onClick={handleClearFilters} variant="ghost">Clear</Button>
+                    </div>
                 </div>
             </div>
 
@@ -176,7 +177,7 @@ export function PlatesTable({ apiData }: PlatesApiResponse) {
                         ) : (
                             <TableRow>
                                 <TableCell colSpan={7} className="h-24 text-center">
-                                    No data available.
+                                    No results found.
                                 </TableCell>
                             </TableRow>
                         )}
