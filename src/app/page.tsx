@@ -2,6 +2,7 @@
 import { PlatesApiResponse } from "@/lib/types";
 import { PlatesTable } from "@/components/app/plates-table";
 import { ModeToggle } from "@/components/mode-toggle";
+import { AdminButton } from "@/components/admin-button";
 import pool from "@/lib/db";
 
 interface HomePageProps {
@@ -62,7 +63,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 A centralized dashboard for license plate monitoring.
               </p>
             </div>
-            <ModeToggle />
+            <div className="flex items-center gap-2">
+              <AdminButton />
+              <ModeToggle />
+            </div>
           </div>
           <PlatesTable
               initialApiData={data}
