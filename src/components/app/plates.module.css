@@ -1,11 +1,10 @@
-/* src/components/app/plates.module.css */
 .plateStyle {
     font-family: var(--font-charles-wright);
     background-color: #FBBF24; /* amber-400 */
     color: #000000;
     padding: 0.2rem 0.75rem;
     border-radius: 0.3rem;
-    border: 2px solid #000000;
+    border: 2px solid #374151; /* gray-700 */
     display: inline-flex;
     align-items: center;
     gap: 0.4em; /* The space in the middle of the plate */
@@ -14,25 +13,28 @@
     font-size: 1.125rem; /* text-lg */
     line-height: 1.75rem;
     box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-    white-space: nowrap; /* Prevents text from wrapping */
+    white-space: nowrap; /* Prevents text from wrapping on small screens */
 }
 
+/* Base styles for all status badges */
 .badge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 0.15rem 0.75rem;
+    padding: 0.1rem 0.75rem;
     border-radius: 9999px; /* rounded-full */
-    font-weight: 600;
+    font-weight: 500;
     font-size: 0.75rem; /* text-xs */
+    text-align: center;
 }
 
+/* Modifier class for Success (Valid, Taxed) */
 .badgeSuccess {
     background-color: var(--success);
     color: var(--success-foreground);
 }
 
-/* Secondary/neutral badge for "No details" */
+/* Secondary/neutral badge for "No details" and other states */
 .badgeSecondary {
     background-color: transparent;
     color: var(--muted-foreground);

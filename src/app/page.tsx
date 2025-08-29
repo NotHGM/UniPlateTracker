@@ -1,6 +1,4 @@
 // src/app/page.tsx
-import { Card, CardContent } from "@/components/ui/card";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { PlatesApiResponse } from "@/lib/types";
 import { PlatesTable } from "@/components/app/plates-table";
 import { ModeToggle } from "@/components/mode-toggle";
@@ -55,32 +53,21 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const { data, error } = await getPlatesData(searchParams);
 
   return (
-      <div className="bg-muted/40 min-h-screen">
+      <div className="bg-background min-h-screen">
         <main className="container mx-auto p-4 sm:p-6 lg:p-8">
-          <div className="flex justify-between items-center mb-4">
+          <div className="flex justify-between items-start mb-6">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">UniPlateTracker</h1>
+              <h1 className="text-3xl font-bold tracking-tight text-foreground">UniPlateTracker</h1>
               <p className="text-muted-foreground">
                 A centralized dashboard for license plate monitoring.
               </p>
             </div>
             <ModeToggle />
           </div>
-
-          <Card>
-            <CardContent className="pt-6">
-              {error ? (
-                  <Alert variant="destructive">
-                    <AlertTitle>Error</AlertTitle>
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-              ) : (
-                  <PlatesTable
-                      initialApiData={data}
-                  />
-              )}
-            </CardContent>
-          </Card>
+          <PlatesTable
+              initialApiData={data}
+              error={error}
+          />
         </main>
       </div>
   );

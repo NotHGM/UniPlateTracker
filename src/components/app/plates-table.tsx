@@ -5,17 +5,18 @@ import { useState, useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { LicensePlate, PlatesApiResponse } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { motion, AnimatePresence } from "framer-motion";
-import useSWR from 'swr';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { DataPagination } from "./data-pagination";
-import { RefreshCw } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import useSWR from 'swr';
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import styles from "./plates.module.css";
+import { RefreshCw } from "lucide-react";
 
 dayjs.extend(relativeTime);
 
@@ -23,6 +24,7 @@ const fetcher = (url: string) => fetch(url).then(res => res.json());
 
 interface PlatesTableProps {
     initialApiData: PlatesApiResponse | null;
+    error?: string | null;
 }
 
 const formatPlate = (plate: string | null): JSX.Element => {
@@ -39,10 +41,10 @@ const getStatusClass = (status: string | null): string => {
     const lowerStatus = status.toLowerCase();
     if (lowerStatus === 'valid' || lowerStatus === 'taxed') return styles.badgeSuccess;
     if (lowerStatus.includes('expire') || lowerStatus.includes('due') || lowerStatus.includes('not taxed')) return styles.badgeDestructive;
-    return styles.badgeSecondary;
+    return styles.badgeSecondary; // For "No details"
 };
 
-export function PlatesTable({ initialApiData }: PlatesTableProps) {
+export function PlatesTable({ initialApiData, error }: PlatesTableProps) {
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
@@ -55,7 +57,6 @@ export function PlatesTable({ initialApiData }: PlatesTableProps) {
         mot: searchParams.get('mot') || 'all',
         tax: searchParams.get('tax') || 'all',
     });
-
     const [displayedPlates, setDisplayedPlates] = useState(initialApiData?.data ?? []);
     const [lastCheckedTimestamp, setLastCheckedTimestamp] = useState(initialApiData?.lastCheckedTimestamp);
     const [showUpdateNotice, setShowUpdateNotice] = useState(false);
@@ -66,24 +67,17 @@ export function PlatesTable({ initialApiData }: PlatesTableProps) {
         setShowUpdateNotice(false);
     }, [initialApiData]);
 
-    const { data: updateData } = useSWR('/api/check-update', fetcher, {
-        refreshInterval: 5000,
-    });
+    const { data: updateData } = useSWR('/api/check-update', { refreshInterval: 5000, fetcher });
 
     useEffect(() => {
         if (!updateData?.lastUpdate || !lastCheckedTimestamp) return;
-
         const isNewDataAvailable = new Date(updateData.lastUpdate) > new Date(lastCheckedTimestamp);
-
         if (isNewDataAvailable) {
-            const hasFiltersOrSearch = searchParams.toString().length > 0 && !(searchParams.toString().length === 5 && searchParams.has('page'));
+            const hasActiveFilters = [...searchParams.keys()].some(k => k !== 'page');
             const isOnAnotherPage = searchParams.has('page') && searchParams.get('page') !== '1';
-
-            if (!isOnAnotherPage && !hasFiltersOrSearch) {
-                console.log("New data available on page 1 with no filters. Auto-refreshing...");
+            if (!isOnAnotherPage && !hasActiveFilters) {
                 router.refresh();
             } else {
-                console.log("New data available, but user is interacting. Showing notice.");
                 setShowUpdateNotice(true);
             }
         }
@@ -92,27 +86,19 @@ export function PlatesTable({ initialApiData }: PlatesTableProps) {
     useEffect(() => {
         const timer = setTimeout(() => {
             const current = new URLSearchParams(searchParams.toString());
-            if (searchTerm) {
-                current.set("search", searchTerm);
-            } else {
-                current.delete("search");
-            }
+            if (searchTerm) current.set("search", searchTerm);
+            else current.delete("search");
             current.set("page", "1");
             router.push(`${pathname}?${current.toString()}`, { scroll: false });
         }, 500);
         return () => clearTimeout(timer);
-    }, [searchTerm]);
+    }, [searchTerm, pathname, router]); // Dependency array simplified
 
     const handleApplyFilters = () => {
-        const current = new URLSearchParams(searchParams.toString());
-        if (searchTerm) { current.set('search', searchTerm); }
-        else { current.delete('search'); }
+        const current = new URLSearchParams(); // Start fresh to remove old params
+        if (searchTerm) current.set('search', searchTerm);
         Object.entries(filters).forEach(([key, value]) => {
-            if (value && value !== 'all') {
-                current.set(key, value);
-            } else {
-                current.delete(key);
-            }
+            if (value && value !== 'all') current.set(key, value);
         });
         current.set("page", "1");
         router.push(`${pathname}?${current.toString()}`, { scroll: false });
@@ -122,104 +108,110 @@ export function PlatesTable({ initialApiData }: PlatesTableProps) {
         router.push(pathname, { scroll: false });
     };
 
-    const handleShowNewPlates = () => {
-        router.push(pathname);
-    };
+    const handleShowNewPlates = () => { router.push(pathname); };
 
     const pagination = initialApiData?.pagination ?? { currentPage: 1, totalPages: 0 };
     const filterOptions = initialApiData?.filterOptions ?? { makes: [], colors: [], years: [] };
+    const plates = displayedPlates;
+
+    if (error) {
+        return (
+            <Alert variant="destructive">
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+            </Alert>
+        );
+    }
 
     return (
         <div className="space-y-4">
-            <AnimatePresence>
-                {showUpdateNotice && (
-                    <motion.div initial={{ opacity: 0, y: -20, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }} exit={{ opacity: 0, y: -20, height: 0 }}>
-                        <Button className="w-full" onClick={handleShowNewPlates}>
-                            <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                            New Detections Available - Click to Show
-                        </Button>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-            <div className="space-y-2">
+            <div className="p-4 bg-card border rounded-lg space-y-4">
                 <Input placeholder="Search for a license plate..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="text-base" />
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-2">
                     <Select value={filters.make} onValueChange={(v) => setFilters(f => ({...f, make: v}))}>
-                        <SelectTrigger className="flex-1 min-w-[120px]"><SelectValue placeholder="All Makes" /></SelectTrigger>
+                        <SelectTrigger className="lg:col-span-1"><SelectValue placeholder="All Makes" /></SelectTrigger>
                         <SelectContent><SelectItem value="all">All Makes</SelectItem>{filterOptions.makes.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
                     </Select>
                     <Select value={filters.color} onValueChange={(v) => setFilters(f => ({...f, color: v}))}>
-                        <SelectTrigger className="flex-1 min-w-[120px]"><SelectValue placeholder="All Colors" /></SelectTrigger>
+                        <SelectTrigger className="lg:col-span-1"><SelectValue placeholder="All Colors" /></SelectTrigger>
                         <SelectContent><SelectItem value="all">All Colors</SelectItem>{filterOptions.colors.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                     </Select>
                     <Select value={filters.year} onValueChange={(v) => setFilters(f => ({...f, year: v}))}>
-                        <SelectTrigger className="w-full md:w-auto min-w-[120px]"><SelectValue placeholder="All Years" /></SelectTrigger>
+                        <SelectTrigger className="lg:col-span-1"><SelectValue placeholder="All Years" /></SelectTrigger>
                         <SelectContent><SelectItem value="all">All Years</SelectItem>{filterOptions.years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
                     </Select>
                     <Select value={filters.mot} onValueChange={(v) => setFilters(f => ({...f, mot: v}))}>
-                        <SelectTrigger className="w-full md:w-auto min-w-[140px]"><SelectValue placeholder="All MOT" /></SelectTrigger>
+                        <SelectTrigger className="lg:col-span-1"><SelectValue placeholder="All MOT" /></SelectTrigger>
                         <SelectContent><SelectItem value="all">All MOT</SelectItem><SelectItem value="Valid">Valid</SelectItem><SelectItem value="Expired">Expired</SelectItem></SelectContent>
                     </Select>
                     <Select value={filters.tax} onValueChange={(v) => setFilters(f => ({...f, tax: v}))}>
-                        <SelectTrigger className="w-full md:w-auto min-w-[140px]"><SelectValue placeholder="All Tax" /></SelectTrigger>
+                        <SelectTrigger className="lg:col-span-1"><SelectValue placeholder="All Tax" /></SelectTrigger>
                         <SelectContent><SelectItem value="all">All Tax</SelectItem><SelectItem value="Taxed">Taxed</SelectItem><SelectItem value="Not Taxed">Not Taxed</SelectItem></SelectContent>
                     </Select>
-                    <div className="flex gap-2 ml-auto">
+                    <div className="flex gap-2 lg:col-span-2 justify-end">
                         <Button onClick={handleApplyFilters}>Apply Filters</Button>
                         <Button onClick={handleClearFilters} variant="ghost">Clear</Button>
                     </div>
                 </div>
             </div>
 
-            <div className="rounded-lg border">
+            <AnimatePresence>
+                {showUpdateNotice && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="pb-4">
+                        <Button className="w-full" onClick={handleShowNewPlates}><RefreshCw className="mr-2 h-4 w-4 animate-spin" />New Detections Available - Click to Show</Button>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            <div className="rounded-lg border bg-card text-card-foreground">
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-[120px]">Image</TableHead>
+                            <TableHead className="w-[120px] pl-6">Image</TableHead>
                             <TableHead>Plate</TableHead>
                             <TableHead>Vehicle Details</TableHead>
                             <TableHead>MOT</TableHead>
                             <TableHead>Tax</TableHead>
                             <TableHead>Registration</TableHead>
-                            <TableHead className="text-left">Last Seen</TableHead>
+                            <TableHead className="text-left pr-6">Last Seen</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         <AnimatePresence>
-                            {displayedPlates.length > 0 ? (
-                                displayedPlates.map((plate) => (
+                            {plates.length > 0 ? (
+                                plates.map((plate) => (
                                     <motion.tr
                                         key={plate.id}
                                         layoutId={`plate-${plate.id}`}
                                         initial={{ opacity: 0, y: -20 }}
                                         animate={{ opacity: 1, y: 0 }}
-                                        transition={{ duration: 0.3 }}
-                                        className="[&:has([data-state=selected])]:bg-muted"
+                                        transition={{ duration: 0.3, ease: "easeOut" }}
                                     >
-                                        <TableCell>
-                                            {plate.image_url ? (<img src={plate.image_url} alt={`Capture of ${plate.plate_number}`} className="w-28 h-auto rounded-md object-cover"/>) : (<div className="w-28 h-16 bg-muted rounded-md"/>)}
+                                        <TableCell className="pl-6 py-2">
+                                            <div className="w-28 aspect-video rounded-md overflow-hidden bg-muted">
+                                                {plate.image_url ? (<img src={plate.image_url} alt={`Capture of ${plate.plate_number}`} className="w-full h-full object-cover"/>) : null}
+                                            </div>
                                         </TableCell>
                                         <TableCell className="align-middle">
                                             <div className={styles.plateStyle}>{formatPlate(plate.plate_number)}</div>
                                         </TableCell>
-                                        <TableCell className="align-top pt-3">
+                                        <TableCell className="align-middle">
                                             <div className="font-semibold">{plate.car_make || 'N/A'}</div>
                                             <div className="text-sm text-muted-foreground">{plate.car_color || 'N/A'} • {plate.fuel_type || 'N/A'}</div>
                                         </TableCell>
-                                        <TableCell className="align-top pt-3">
+                                        <TableCell className="align-middle">
                                             <div className={cn(styles.badge, getStatusClass(plate.mot_status))}>{plate.mot_status || 'N/A'}</div>
                                             {plate.mot_expiry_date && <div className="text-xs text-muted-foreground mt-1">Expires {dayjs(plate.mot_expiry_date).format('DD/MM/YYYY')}</div>}
                                         </TableCell>
-                                        <TableCell className="align-top pt-3">
+                                        <TableCell className="align-middle">
                                             <div className={cn(styles.badge, getStatusClass(plate.tax_status))}>{plate.tax_status || 'N/A'}</div>
                                             {plate.tax_due_date && <div className="text-xs text-muted-foreground mt-1">Due {dayjs(plate.tax_due_date).format('DD/MM/YYYY')}</div>}
                                         </TableCell>
-                                        <TableCell className="align-top pt-3">
+                                        <TableCell className="align-middle">
                                             <div className="font-semibold">{plate.year_of_manufacture || 'N/A'}</div>
                                             <div className="text-sm text-muted-foreground">{plate.month_of_first_registration ? `Reg: ${dayjs(plate.month_of_first_registration).format('MMM YYYY')}` : 'N/A'}</div>
                                         </TableCell>
-                                        <TableCell className="text-left align-top pt-3">
+                                        <TableCell className="text-left align-middle pr-6">
                                             <div className="font-semibold">{dayjs(plate.recent_capture_time).fromNow()}</div>
                                             <div className="text-xs text-muted-foreground">{dayjs(plate.recent_capture_time).format('DD/MM/YY HH:mm')}</div>
                                         </TableCell>
@@ -232,8 +224,9 @@ export function PlatesTable({ initialApiData }: PlatesTableProps) {
                     </TableBody>
                 </Table>
             </div>
+
             {pagination.totalPages > 1 && (
-                <div className="flex justify-center mt-4">
+                <div className="flex justify-end mt-4">
                     <DataPagination currentPage={pagination.currentPage} totalPages={pagination.totalPages} />
                 </div>
             )}
