@@ -1,0 +1,21 @@
+/* src/components/admin/admindash.module.css */
+
+.chartTooltip {
+    background-color: hsl(var(--card)) !important; /* Use card color for background */
+    border-color: hsl(var(--border)) !important;
+    border-radius: var(--radius) !important;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    color: hsl(var(--card-foreground)) !important;
+    padding: 0.5rem 0.75rem !important;
+}
+
+/* Style for the 'Hour: 15:00' part of the tooltip */
+.chartTooltipLabel {
+    font-weight: 600 !important;
+    margin-bottom: 0.25rem !important;
+    color: hsl(var(--muted-foreground)) !important;
+}
+
+.chartTooltipValue {
+    color: hsl(var(--primary)) !important;
+}
