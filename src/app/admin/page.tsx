@@ -1,7 +1,10 @@
 // src/app/admin/page.tsx
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/session";
 import { DashboardClient } from "@/components/admin/dashboard-client";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { LogoutButton } from "@/components/admin/logout-button";
 
 async function getStatsData() {
     const baseUrl = process.env.NEXTAUTH_URL;
@@ -21,20 +24,27 @@ async function getStatsData() {
 }
 
 export default async function AdminDashboardPage() {
+    const session = await getSession();
 
+    if (!session.user) {
+        redirect("/admin/auth");
+    }
     const { data, error } = await getStatsData();
 
     return (
         <div className="bg-muted/40 min-h-screen">
             <main className="container mx-auto p-4 sm:p-6 lg:p-8">
-                <div className="flex justify-between items-center mb-6">
+                <div className="flex justify-between items-start mb-6">
                     <div>
                         <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
                         <p className="text-muted-foreground">
-                            Overview and statistics for UniPlateTracker.
+                            Welcome back, {session.user.email}
                         </p>
                     </div>
-                    <ModeToggle />
+                    <div className="flex items-center gap-2">
+                        <ModeToggle />
+                        <LogoutButton />
+                    </div>
                 </div>
                 {error ? (
                     <Alert variant="destructive">
@@ -46,5 +56,5 @@ export default async function AdminDashboardPage() {
                 )}
             </main>
         </div>
-    )
+    );
 }
