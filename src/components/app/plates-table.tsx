@@ -70,7 +70,7 @@ export function PlatesTable({ initialApiData, error }: PlatesTableProps) {
     }, [initialApiData]);
 
     const { data: updateData } = useSWR('/api/check-update', { refreshInterval: 5000, fetcher });
-    
+
     useEffect(() => {
         if (!updateData?.lastUpdate || !lastCheckedTimestamp) return;
         const isNewDataAvailable = new Date(updateData.lastUpdate) > new Date(lastCheckedTimestamp);
@@ -81,7 +81,7 @@ export function PlatesTable({ initialApiData, error }: PlatesTableProps) {
             else { setShowUpdateNotice(true); }
         }
     }, [updateData, lastCheckedTimestamp, router, searchParams]);
-    
+
     useEffect(() => {
         const timer = setTimeout(() => {
             const current = new URLSearchParams();
@@ -98,7 +98,6 @@ export function PlatesTable({ initialApiData, error }: PlatesTableProps) {
 
 
     const handleClearFilters = () => {
-        router.push(pathname, { scroll: false });
         setFilters({ search: '', make: 'all', color: 'all', year: 'all', mot: 'all', tax: 'all' });
     };
 
@@ -114,30 +113,30 @@ export function PlatesTable({ initialApiData, error }: PlatesTableProps) {
         <div className="space-y-4">
             <div className="p-4 bg-card border rounded-lg space-y-4">
                 <Input placeholder="Search for a license plate..." value={filters.search} onChange={e => setFilters(f => ({ ...f, search: e.target.value }))} className="text-base" />
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-2">
+
+                <div className="flex flex-wrap items-center gap-2">
                     <Select value={filters.make} onValueChange={(v) => setFilters(f => ({ ...f, make: v }))}>
-                        <SelectTrigger className="lg:col-span-1"><SelectValue placeholder="All Makes" /></SelectTrigger>
+                        <SelectTrigger className="flex-1 min-w-[120px]"><SelectValue placeholder="All Makes" /></SelectTrigger>
                         <SelectContent><SelectItem value="all">All Makes</SelectItem>{filterOptions.makes.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
                     </Select>
                     <Select value={filters.color} onValueChange={(v) => setFilters(f => ({ ...f, color: v }))}>
-                        <SelectTrigger className="lg:col-span-1"><SelectValue placeholder="All Colors" /></SelectTrigger>
+                        <SelectTrigger className="flex-1 min-w-[120px]"><SelectValue placeholder="All Colors" /></SelectTrigger>
                         <SelectContent><SelectItem value="all">All Colors</SelectItem>{filterOptions.colors.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                     </Select>
                     <Select value={filters.year} onValueChange={(v) => setFilters(f => ({ ...f, year: v }))}>
-                        <SelectTrigger className="lg:col-span-1"><SelectValue placeholder="All Years" /></SelectTrigger>
+                        <SelectTrigger className="flex-1 min-w-[120px]"><SelectValue placeholder="All Years" /></SelectTrigger>
                         <SelectContent><SelectItem value="all">All Years</SelectItem>{filterOptions.years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
                     </Select>
                     <Select value={filters.mot} onValueChange={(v) => setFilters(f => ({ ...f, mot: v }))}>
-                        <SelectTrigger className="lg:col-span-1"><SelectValue placeholder="All MOT" /></SelectTrigger>
+                        <SelectTrigger className="flex-1 min-w-[120px]"><SelectValue placeholder="All MOT" /></SelectTrigger>
                         <SelectContent><SelectItem value="all">All MOT</SelectItem><SelectItem value="Valid">Valid</SelectItem><SelectItem value="Expired">Expired</SelectItem></SelectContent>
                     </Select>
                     <Select value={filters.tax} onValueChange={(v) => setFilters(f => ({ ...f, tax: v }))}>
-                        <SelectTrigger className="lg:col-span-1"><SelectValue placeholder="All Tax" /></SelectTrigger>
+                        <SelectTrigger className="flex-1 min-w-[120px]"><SelectValue placeholder="All Tax" /></SelectTrigger>
                         <SelectContent><SelectItem value="all">All Tax</SelectItem><SelectItem value="Taxed">Taxed</SelectItem><SelectItem value="Not Taxed">Not Taxed</SelectItem></SelectContent>
                     </Select>
-                    <div className="col-span-2 flex justify-end">
-                        <Button onClick={handleClearFilters} variant="ghost">Clear</Button>
-                    </div>
+                    <div className="flex-grow"></div>
+                    <Button onClick={handleClearFilters} variant="ghost" className="text-muted-foreground">Clear</Button>
                 </div>
             </div>
 
@@ -201,7 +200,11 @@ export function PlatesTable({ initialApiData, error }: PlatesTableProps) {
                 </Table>
             </div>
 
-            {pagination.totalPages > 1 && ( <div className="flex justify-end mt-4"> <DataPagination currentPage={pagination.currentPage} totalPages={pagination.totalPages} /> </div> )}
+            {pagination.totalPages > 1 && (
+                <div className="flex justify-end mt-4">
+                    <DataPagination currentPage={pagination.currentPage} totalPages={pagination.totalPages} />
+                </div>
+            )}
         </div>
     );
 }
