@@ -4,14 +4,15 @@
   "private": true,
   "scripts": {
     "dev": "PORT=3007 npm-run-all --parallel dev:next dev:worker",
-    "dev:next": "next dev --turbopack",
+    "dev:next": "next dev",
     "dev:worker": "tsx watch worker/src/index.ts",
-    "build": "next build",
+    "build": "npm-run-all build:next build:worker",
+    "build:next": "next build",
+    "build:worker": "npm run build --prefix worker",
     "start": "npm-run-all --parallel start:next start:worker",
     "start:next": "next start",
-    "start:worker": "node dist/worker/index.js",
+    "start:worker": "npm run start --prefix worker",
     "lint": "next lint",
-    "build:worker": "tsc --project worker/tsconfig.json",
     "db:init": "tsx scripts/init-db.ts"
   },
   "dependencies": {

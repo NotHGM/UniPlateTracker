@@ -4,7 +4,8 @@
   "description": "Background service for UniPlateTracker to process UniFi Protect webhooks.",
   "main": "src/index.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc"
   },
   "dependencies": {
     "axios": "^1.11.0",

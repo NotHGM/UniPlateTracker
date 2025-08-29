@@ -1,111 +1,125 @@
 # UniPlateTracker
 
-**UniPlateTracker** is a robust, self-hosted license plate recognition and tracking dashboard. It is designed for prosumer and enterprise use, providing a secure and scalable solution for monitoring vehicle activity directly from a UniFi Protect camera system.
+**UniPlateTracker** is a secure, private, and self-hosted dashboard for tracking license plates captured by your UniFi Protect camera system. It gives you a clean web interface to view, search, and analyze vehicle activity on your property.
 
-This application uses a real-time, event-driven architecture. A dedicated background worker listens for webhook notifications directly from a UniFi Protect NVR. When a license plate is detected, the worker processes the event, saves the included `base64` thumbnail image directly into a PostgreSQL database, and logs the event details. The data is then presented in a clean, modern web interface built with Next.js.
-
----
+Events are received in real-time from your UniFi NVR via webhooks. The application enriches each license plate with official data from the DVLA (such as make, color, tax, and MOT status) and stores everything, including thumbnail images, in your private PostgreSQL database.
 
 ## ✨ Key Features
 
-- **Real-Time Webhook Processing:** A dedicated background service instantly receives LPR (License Plate Recognition) events from UniFi Protect.
-- **Self-Contained Image Storage:** Decodes `base64` thumbnails from the webhook payload and stores them directly in the database, requiring no server file system storage.
-- **Modern Web Dashboard:** A fast and responsive web UI built with Next.js and shadcn/ui.
-- **Server-Driven UI:** Utilizes React Server Components for optimal performance and data fetching.
-- **Paginated Data Table:** Efficiently handles large datasets with server-side pagination.
-- **Secure Backend:** Features a type-safe API with input validation using Zod.
-- **Enterprise-Grade Architecture:** Employs a stable two-process model (web server + background worker) to ensure UI responsiveness and service reliability.
+-   **Real-Time Event Processing:** Instantly receives and processes license plate detections from UniFi Protect.
+-   **DVLA Integration:** Automatically fetches vehicle details like make, color, tax, and MOT status.
+-   **Private Image Storage:** Thumbnails are stored directly in your database, ensuring your data remains private and secure.
+-   **Modern Web Dashboard:** A fast and responsive interface with dynamic filters, search, and automatic live updates for new detections.
+-   **Admin Analytics:** A separate, protected admin dashboard with charts and statistics to visualize trends.
+-   **Secure Authentication:** A complete admin login and sign-up system, with access controlled by a list of approved emails.
+-   **Light & Dark Mode:** Adapts to your system preferences for comfortable viewing.
 
 ## 🛠️ Tech Stack
 
-- **Framework:** Next.js (App Router, Turbopack)
-- **Language:** TypeScript
-- **Backend:** Next.js API Routes & a standalone Node.js Worker Service (using Express.js)
-- **Database:** PostgreSQL
-- **UI:** React, Tailwind CSS, shadcn/ui
-- **Data Validation:** Zod
-- **Core Integration:** UniFi Protect (via LPR Webhooks)
+-   **Framework:** Next.js (App Router)
+-   **Language:** TypeScript
+-   **Backend:** Next.js API Routes & a standalone Express.js Worker
+-   **Database:** PostgreSQL
+-   **UI:** React, Tailwind CSS, shadcn/ui
+-   **API Integration:** UniFi Protect Webhooks, DVLA API
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Deployment Guide
 
-Follow these instructions to get a development environment up and running.
+Follow these instructions to build and run UniPlateTracker in a production environment.
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (v20.x or later is highly recommended)
-- [npm](https://www.npmjs.com/) or your preferred package manager
-- [PostgreSQL](https://www.postgresql.org/) Database Server
-- A running UniFi Protect NVR (UDM Pro, UNVR, etc.) with at least one camera capable of LPR.
+-   A server or computer to run the application (e.g., Docker, Linux VM, Raspberry Pi 5).
+-   [Node.js](https://nodejs.org/) (v20.x or later).
+-   A [PostgreSQL](https://www.postgresql.org/) database.
+-   A UniFi Protect NVR (UDM Pro, UNVR, etc.) with at least one LPR-capable camera.
+-   An API Key from the [DVLA Vehicle Enquiry Service](https://developer-portal.driver-vehicle-licensing.api.gov.uk/apis/authentication-api/authentication-api-description.html).
 
-### Installation & Setup
+### Step 1: Clone the Repository
 
-1.  **Clone the repository:**
+```bash
+git clone https://github.com/NotHGM/UniPlateTracker.git
+cd UniPlateTracker
+```
+
+### Step 2: Configure Environment Variables
+
+Create your production configuration file by copying the example. **Remember to use your server's real IP or domain for `NEXTAUTH_URL`.**
+```bash
+cp .env.example .env.local
+```
+Open `.env.local` and fill in your details (database URL, DVLA key, session secret, etc.).
+
+### Step 3: Install Dependencies
+
+Install the necessary packages for both the main app and the worker service.
+```bash
+# Install root dependencies
+npm install
+
+# Install worker dependencies
+npm install --prefix worker
+```
+
+### Step 4: Set Up the Database
+
+Run this interactive script to create all necessary tables and add the first approved admin email.
+```bash
+npm run db:init
+```
+
+### Step 5: Configure the UniFi Protect Webhook
+
+Tell your UniFi NVR where to send detection events.
+1.  In UniFi Protect, go to **Settings > System > Other Settings**.
+2.  Under **Alarm Manager**, click **Create Alarm**.
+3.  Configure the alarm:
+    *   **Name:** `UniPlateTracker`
+    *   **Trigger:** Go to **ID > LPR** and check **Unknown Vehicles** and **Known Vehicles**.
+    *   **Scope:** Select your LPR camera(s).
+    *   **Action:**
+        *   **Webhook Type:** `Custom Webhook`
+        *   **Delivery URL:** `http://[YOUR_SERVER_IP]:[WORKER_PORT]/webhook` (e.g., `http://192.168.1.50:4000/webhook`)
+        *   **Advanced Settings > Method:** `POST`
+        *   **Advanced Settings > Enable Use Thumbnails:** Toggle **ON**.
+4.  Click **Save**.
+
+### Step 6: Build the Application for Production
+
+This single command compiles both the Next.js frontend and the TypeScript worker into optimized JavaScript.
+```bash
+npm run build
+```
+
+### Step 7: Run the Application
+
+This single command starts both the Next.js web server and the background webhook worker together. The Next.js app will run on the port specified by the `PORT` environment variable (defaults to 3000), or you can specify it like so: `PORT=3007 npm start`.
+
+```bash
+npm start
+```
+
+Your application is now running. Keep the terminal open.
+
+#### (Recommended) Running Persistently with PM2
+
+To keep the application running after you close your terminal, you can use a process manager like PM2.
+
+1.  **Install PM2 globally:**
     ```bash
-    git clone https://github.com/NotHGM/UniPlateTracker.git
-    cd UniPlateTracker
+    npm install pm2 -g
     ```
 
-2.  **Configure Environment Variables:**
-    Create a local environment file by copying the example.
+2.  **Start your entire application under one roof with PM2:**
     ```bash
-    cp .env.example .env.local
-    ```
-    Now, open `.env.local` and fill in all the required values.
-
-3.  **Install Dependencies:**
-    This project uses a monorepo-like structure with a separate `worker` directory.
-    ```bash
-    # Install root dependencies for the Next.js app
-    npm install
-
-    # Install worker dependencies
-    cd worker
-    npm install
-    cd ..
+    pm2 start "npm start" --name "uniplatetracker"
     ```
 
-4.  **Set Up the Database:**
-    Run the database migration scripts in order to create and configure the `license_plates` table.
+3.  **To ensure it restarts on server reboot, run:**
     ```bash
-    npx ts-node --require dotenv/config scripts/001-create-initial-tables.ts
-    npx ts-node --require dotenv/config scripts/004-change-image-column-to-text.ts
+    pm2 startup
+    pm2 save
     ```
-
-5.  **Configure UniFi Protect Webhook:**
-    - In your UniFi Protect dashboard, go to the **System Log > Alarms**.
-    - Create a **New Alarm**.
-    - **Trigger:** Select the **ID** tab, then the **LPR** sub-tab. Check "Unknown Vehicles" and "Known Vehicles".
-    - **Scope:** Select the camera(s) you want to monitor.
-    - **Action:** Select **Webhook**.
-        - **Delivery URL:** `http://[IP_OF_YOUR_SERVER]:[WORKER_PORT]/webhook` (e.g., `http://192.168.1.177:4000/webhook`)
-        - Click **Advanced Settings** and ensure the **Method** is set to **POST**.
-
-6.  **Run the Application:**
-    Start the entire application (Next.js web server and background worker) with a single command.
-    ```bash
-    npm run dev
-    ```
-    Your application will be available at `http://localhost:3000` (or the `NEXTAUTH_URL` you configured).
-
----
-
-## ⚙️ Environment Variables
-
-The following variables must be set in your `.env.local` file for the application to function.
-
-| Variable          | Description                                                               | Example                                     |
-| ----------------- | ------------------------------------------------------------------------- | ------------------------------------------- |
-| `POSTGRES_URL`    | The full connection string for your PostgreSQL database.                  | `postgresql://user:pass@host:5432/dbname`   |
-| `WORKER_PORT`     | The network port for the webhook worker service to listen on.             | `4000`                                      |
-| `NEXTAUTH_URL`    | The canonical URL of your web application.                                | `http://localhost:3000`                     |
-| `NEXTAUTH_SECRET` | A strong, random secret for signing authentication tokens (for future use). | `generate-with-openssl-rand-base64-32`      |
-
-
-## 🗺️ Future Roadmap
-
-- [X] **DVLA Integration:** Fetch vehicle details (make, color, tax status) from the DVLA API.
-- [X] **User Authentication:** Implement user logins and role-based access control with NextAuth.js.
-- [X] **Advanced Filtering & Search:** Add UI controls to filter the data table by make, color, date, etc.
-- [X] **Dashboard Analytics:** Add charts and graphs to visualize detection trends over time.
+You can monitor your app with `pm2 list`.
