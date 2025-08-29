@@ -1,7 +1,7 @@
 // src/components/app/plates-table.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { LicensePlate, PlatesApiResponse } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -41,7 +41,7 @@ const getStatusClass = (status: string | null): string => {
     const lowerStatus = status.toLowerCase();
     if (lowerStatus === 'valid' || lowerStatus === 'taxed') return styles.badgeSuccess;
     if (lowerStatus.includes('expire') || lowerStatus.includes('due') || lowerStatus.includes('not taxed')) return styles.badgeDestructive;
-    return styles.badgeSecondary; // For "No details"
+    return styles.badgeSecondary;
 };
 
 export function PlatesTable({ initialApiData, error }: PlatesTableProps) {
@@ -49,14 +49,16 @@ export function PlatesTable({ initialApiData, error }: PlatesTableProps) {
     const pathname = usePathname();
     const searchParams = useSearchParams();
 
-    const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
-    const [filters, setFilters] = useState({
+    const initialFilters = useMemo(() => ({
+        search: searchParams.get('search') || '',
         make: searchParams.get('make') || 'all',
         color: searchParams.get('color') || 'all',
         year: searchParams.get('year') || 'all',
         mot: searchParams.get('mot') || 'all',
         tax: searchParams.get('tax') || 'all',
-    });
+    }), [searchParams]);
+
+    const [filters, setFilters] = useState(initialFilters);
     const [displayedPlates, setDisplayedPlates] = useState(initialApiData?.data ?? []);
     const [lastCheckedTimestamp, setLastCheckedTimestamp] = useState(initialApiData?.lastCheckedTimestamp);
     const [showUpdateNotice, setShowUpdateNotice] = useState(false);
@@ -68,44 +70,36 @@ export function PlatesTable({ initialApiData, error }: PlatesTableProps) {
     }, [initialApiData]);
 
     const { data: updateData } = useSWR('/api/check-update', { refreshInterval: 5000, fetcher });
-
+    
     useEffect(() => {
         if (!updateData?.lastUpdate || !lastCheckedTimestamp) return;
         const isNewDataAvailable = new Date(updateData.lastUpdate) > new Date(lastCheckedTimestamp);
         if (isNewDataAvailable) {
             const hasActiveFilters = [...searchParams.keys()].some(k => k !== 'page');
             const isOnAnotherPage = searchParams.has('page') && searchParams.get('page') !== '1';
-            if (!isOnAnotherPage && !hasActiveFilters) {
-                router.refresh();
-            } else {
-                setShowUpdateNotice(true);
-            }
+            if (!isOnAnotherPage && !hasActiveFilters) { router.refresh(); }
+            else { setShowUpdateNotice(true); }
         }
     }, [updateData, lastCheckedTimestamp, router, searchParams]);
-
+    
     useEffect(() => {
         const timer = setTimeout(() => {
-            const current = new URLSearchParams(searchParams.toString());
-            if (searchTerm) current.set("search", searchTerm);
-            else current.delete("search");
+            const current = new URLSearchParams();
+            Object.entries(filters).forEach(([key, value]) => {
+                if (value && value !== 'all') {
+                    current.set(key, value);
+                }
+            });
             current.set("page", "1");
             router.push(`${pathname}?${current.toString()}`, { scroll: false });
         }, 500);
         return () => clearTimeout(timer);
-    }, [searchTerm, pathname, router]); // Dependency array simplified
+    }, [filters, pathname, router]);
 
-    const handleApplyFilters = () => {
-        const current = new URLSearchParams(); // Start fresh to remove old params
-        if (searchTerm) current.set('search', searchTerm);
-        Object.entries(filters).forEach(([key, value]) => {
-            if (value && value !== 'all') current.set(key, value);
-        });
-        current.set("page", "1");
-        router.push(`${pathname}?${current.toString()}`, { scroll: false });
-    };
 
     const handleClearFilters = () => {
         router.push(pathname, { scroll: false });
+        setFilters({ search: '', make: 'all', color: 'all', year: 'all', mot: 'all', tax: 'all' });
     };
 
     const handleShowNewPlates = () => { router.push(pathname); };
@@ -114,42 +108,34 @@ export function PlatesTable({ initialApiData, error }: PlatesTableProps) {
     const filterOptions = initialApiData?.filterOptions ?? { makes: [], colors: [], years: [] };
     const plates = displayedPlates;
 
-    if (error) {
-        return (
-            <Alert variant="destructive">
-                <AlertTitle>Error</AlertTitle>
-                <AlertDescription>{error}</AlertDescription>
-            </Alert>
-        );
-    }
+    if (error) return <Alert variant="destructive"><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>;
 
     return (
         <div className="space-y-4">
             <div className="p-4 bg-card border rounded-lg space-y-4">
-                <Input placeholder="Search for a license plate..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="text-base" />
+                <Input placeholder="Search for a license plate..." value={filters.search} onChange={e => setFilters(f => ({ ...f, search: e.target.value }))} className="text-base" />
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-2">
-                    <Select value={filters.make} onValueChange={(v) => setFilters(f => ({...f, make: v}))}>
+                    <Select value={filters.make} onValueChange={(v) => setFilters(f => ({ ...f, make: v }))}>
                         <SelectTrigger className="lg:col-span-1"><SelectValue placeholder="All Makes" /></SelectTrigger>
                         <SelectContent><SelectItem value="all">All Makes</SelectItem>{filterOptions.makes.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
                     </Select>
-                    <Select value={filters.color} onValueChange={(v) => setFilters(f => ({...f, color: v}))}>
+                    <Select value={filters.color} onValueChange={(v) => setFilters(f => ({ ...f, color: v }))}>
                         <SelectTrigger className="lg:col-span-1"><SelectValue placeholder="All Colors" /></SelectTrigger>
                         <SelectContent><SelectItem value="all">All Colors</SelectItem>{filterOptions.colors.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                     </Select>
-                    <Select value={filters.year} onValueChange={(v) => setFilters(f => ({...f, year: v}))}>
+                    <Select value={filters.year} onValueChange={(v) => setFilters(f => ({ ...f, year: v }))}>
                         <SelectTrigger className="lg:col-span-1"><SelectValue placeholder="All Years" /></SelectTrigger>
                         <SelectContent><SelectItem value="all">All Years</SelectItem>{filterOptions.years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
                     </Select>
-                    <Select value={filters.mot} onValueChange={(v) => setFilters(f => ({...f, mot: v}))}>
+                    <Select value={filters.mot} onValueChange={(v) => setFilters(f => ({ ...f, mot: v }))}>
                         <SelectTrigger className="lg:col-span-1"><SelectValue placeholder="All MOT" /></SelectTrigger>
                         <SelectContent><SelectItem value="all">All MOT</SelectItem><SelectItem value="Valid">Valid</SelectItem><SelectItem value="Expired">Expired</SelectItem></SelectContent>
                     </Select>
-                    <Select value={filters.tax} onValueChange={(v) => setFilters(f => ({...f, tax: v}))}>
+                    <Select value={filters.tax} onValueChange={(v) => setFilters(f => ({ ...f, tax: v }))}>
                         <SelectTrigger className="lg:col-span-1"><SelectValue placeholder="All Tax" /></SelectTrigger>
                         <SelectContent><SelectItem value="all">All Tax</SelectItem><SelectItem value="Taxed">Taxed</SelectItem><SelectItem value="Not Taxed">Not Taxed</SelectItem></SelectContent>
                     </Select>
-                    <div className="flex gap-2 lg:col-span-2 justify-end">
-                        <Button onClick={handleApplyFilters}>Apply Filters</Button>
+                    <div className="col-span-2 flex justify-end">
                         <Button onClick={handleClearFilters} variant="ghost">Clear</Button>
                     </div>
                 </div>
@@ -180,21 +166,13 @@ export function PlatesTable({ initialApiData, error }: PlatesTableProps) {
                         <AnimatePresence>
                             {plates.length > 0 ? (
                                 plates.map((plate) => (
-                                    <motion.tr
-                                        key={plate.id}
-                                        layoutId={`plate-${plate.id}`}
-                                        initial={{ opacity: 0, y: -20 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ duration: 0.3, ease: "easeOut" }}
-                                    >
+                                    <motion.tr key={plate.id} layoutId={`plate-${plate.id}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3, ease: "easeOut" }}>
                                         <TableCell className="pl-6 py-2">
                                             <div className="w-28 aspect-video rounded-md overflow-hidden bg-muted">
                                                 {plate.image_url ? (<img src={plate.image_url} alt={`Capture of ${plate.plate_number}`} className="w-full h-full object-cover"/>) : null}
                                             </div>
                                         </TableCell>
-                                        <TableCell className="align-middle">
-                                            <div className={styles.plateStyle}>{formatPlate(plate.plate_number)}</div>
-                                        </TableCell>
+                                        <TableCell className="align-middle"><div className={styles.plateStyle}>{formatPlate(plate.plate_number)}</div></TableCell>
                                         <TableCell className="align-middle">
                                             <div className="font-semibold">{plate.car_make || 'N/A'}</div>
                                             <div className="text-sm text-muted-foreground">{plate.car_color || 'N/A'} • {plate.fuel_type || 'N/A'}</div>
@@ -217,19 +195,13 @@ export function PlatesTable({ initialApiData, error }: PlatesTableProps) {
                                         </TableCell>
                                     </motion.tr>
                                 ))
-                            ) : (
-                                <TableRow><TableCell colSpan={7} className="h-24 text-center">No results found.</TableCell></TableRow>
-                            )}
+                            ) : ( <TableRow><TableCell colSpan={7} className="h-24 text-center">No results found.</TableCell></TableRow> )}
                         </AnimatePresence>
                     </TableBody>
                 </Table>
             </div>
 
-            {pagination.totalPages > 1 && (
-                <div className="flex justify-end mt-4">
-                    <DataPagination currentPage={pagination.currentPage} totalPages={pagination.totalPages} />
-                </div>
-            )}
+            {pagination.totalPages > 1 && ( <div className="flex justify-end mt-4"> <DataPagination currentPage={pagination.currentPage} totalPages={pagination.totalPages} /> </div> )}
         </div>
     );
 }
