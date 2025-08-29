@@ -1,10 +1,10 @@
+// worker/src/index.ts
 import express = require('express');
 import { Pool } from 'pg';
 import path from 'path';
 import dotenv from 'dotenv';
 import axios from 'axios';
 
-// --- Configuration ---
 dotenv.config({ path: path.resolve(__dirname, '../../.env.local') });
 
 const {
@@ -21,7 +21,6 @@ if (!POSTGRES_URL || !WORKER_PORT || !DVLA_API_KEY) {
 const port = parseInt(WORKER_PORT, 10);
 const pool = new Pool({ connectionString: POSTGRES_URL });
 
-// --- MODIFIED: Update the type for the DVLA data ---
 interface VehicleDetails {
     make: string;
     colour: string;
@@ -31,11 +30,9 @@ interface VehicleDetails {
     motExpiryDate?: string;
     taxDueDate?: string;
     yearOfManufacture: number;
-    monthOfFirstRegistration: string; // <-- NEW
+    monthOfFirstRegistration: string;
 }
 
-
-// --- DVLA API Logic (Unchanged) ---
 async function getVehicleDetailsFromDVLA(plateNumber: string): Promise<VehicleDetails | null> {
     const apiUrl = 'https://driver-vehicle-licensing.api.gov.uk/vehicle-enquiry/v1/vehicles';
     const headers = {
@@ -61,8 +58,6 @@ async function getVehicleDetailsFromDVLA(plateNumber: string): Promise<VehicleDe
     }
 }
 
-
-// --- MODIFIED: Database Logic now accepts the new detail ---
 async function processPlateData(
     plateNumber: string,
     thumbnailBase64: string | undefined,
@@ -70,10 +65,11 @@ async function processPlateData(
 ) {
     const client = await pool.connect();
     try {
+        await client.query('BEGIN');
+
         const captureTime = new Date();
         const existingPlate = await client.query('SELECT id FROM license_plates WHERE plate_number = $1', [plateNumber]);
 
-        // --- MODIFIED: Add the new field to our data array ---
         const vehicleData = [
             details.make,
             details.colour,
@@ -83,41 +79,44 @@ async function processPlateData(
             details.motExpiryDate || null,
             details.taxDueDate || null,
             details.yearOfManufacture,
-            details.monthOfFirstRegistration || null // <-- NEW
+            details.monthOfFirstRegistration || null
         ];
 
         if (existingPlate.rows.length > 0) {
             const plateId = existingPlate.rows[0].id;
-            // MODIFIED: Add the new column to the UPDATE statement
             await client.query(
-                `UPDATE license_plates SET 
-                    recent_capture_time = $1, image_url = $2, car_make = $3, car_color = $4, fuel_type = $5,
-                    mot_status = $6, tax_status = $7, mot_expiry_date = $8, tax_due_date = $9, 
-                    year_of_manufacture = $10, month_of_first_registration = $11, updated_at = NOW() 
-                WHERE id = $12`, // <-- Note parameter indices have shifted
+                `UPDATE license_plates SET
+                                           recent_capture_time = $1, image_url = $2, car_make = $3, car_color = $4, fuel_type = $5,
+                                           mot_status = $6, tax_status = $7, mot_expiry_date = $8, tax_due_date = $9,
+                                           year_of_manufacture = $10, month_of_first_registration = $11, updated_at = NOW()
+                 WHERE id = $12`,
                 [captureTime, thumbnailBase64, ...vehicleData, plateId]
             );
             console.log(`[${plateNumber}] Updated record in database with new details.`);
         } else {
-            // MODIFIED: Add the new column to the INSERT statement
             await client.query(
                 `INSERT INTO license_plates (
-                    plate_number, capture_time, recent_capture_time, image_url, 
-                    car_make, car_color, fuel_type, mot_status, tax_status, 
+                    plate_number, capture_time, recent_capture_time, image_url,
+                    car_make, car_color, fuel_type, mot_status, tax_status,
                     mot_expiry_date, tax_due_date, year_of_manufacture, month_of_first_registration
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`, // <-- Note parameter indices have shifted
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
                 [plateNumber, captureTime, captureTime, thumbnailBase64, ...vehicleData]
             );
             console.log(`[${plateNumber}] Created new record in database with details.`);
         }
+
+
+        await client.query('UPDATE app_state SET last_plate_update = NOW() WHERE id = 1');
+
+        await client.query('COMMIT');
     } catch (error) {
-        if (error instanceof Error) { console.error(`[${plateNumber}] Database Error:`, error.message); }
+        await client.query('ROLLBACK');
+        if (error instanceof Error) { console.error(`[${plateNumber}] Database Transaction Error:`, error.message); }
     } finally {
         client.release();
     }
 }
 
-// --- Webhook Server (Unchanged) ---
 const app = express();
 app.use(express.json({ limit: '10mb' }));
 
@@ -141,7 +140,6 @@ app.post('/webhook', async (req: express.Request, res: express.Response) => {
         } else {
             console.log(`[${sanitizedPlate}] Plate rejected by DVLA check. Ignoring entry.`);
         }
-
     } else {
         console.warn("Webhook received, but no plate data was not found.");
     }

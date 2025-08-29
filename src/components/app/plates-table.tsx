@@ -5,16 +5,21 @@ import { useState, useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { LicensePlate, PlatesApiResponse } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { motion, AnimatePresence } from "framer-motion";
+import useSWR from 'swr';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DataPagination } from "./data-pagination";
+import { RefreshCw } from "lucide-react";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import styles from "./plates.module.css";
 
 dayjs.extend(relativeTime);
+
+const fetcher = (url: string) => fetch(url).then(res => res.json());
 
 interface PlatesTableProps {
     initialApiData: PlatesApiResponse | null;
@@ -24,9 +29,7 @@ const formatPlate = (plate: string | null): JSX.Element => {
     if (!plate) return <>{'N/A'}</>;
     plate = plate.replace(/\s/g, '');
     if (plate.length >= 7) {
-        const firstPart = plate.substring(0, 4);
-        const secondPart = plate.substring(4);
-        return <><span>{firstPart}</span><span>{secondPart}</span></>;
+        return <><span>{plate.substring(0, 4)}</span><span>{plate.substring(4)}</span></>;
     }
     return <span>{plate}</span>;
 };
@@ -53,9 +56,38 @@ export function PlatesTable({ initialApiData }: PlatesTableProps) {
         tax: searchParams.get('tax') || 'all',
     });
 
-    const plates = initialApiData?.data ?? [];
-    const pagination = initialApiData?.pagination ?? { currentPage: 1, totalPages: 0 };
-    const filterOptions = initialApiData?.filterOptions ?? { makes: [], colors: [], years: [] };
+    const [displayedPlates, setDisplayedPlates] = useState(initialApiData?.data ?? []);
+    const [lastCheckedTimestamp, setLastCheckedTimestamp] = useState(initialApiData?.lastCheckedTimestamp);
+    const [showUpdateNotice, setShowUpdateNotice] = useState(false);
+
+    useEffect(() => {
+        setDisplayedPlates(initialApiData?.data ?? []);
+        setLastCheckedTimestamp(initialApiData?.lastCheckedTimestamp);
+        setShowUpdateNotice(false);
+    }, [initialApiData]);
+
+    const { data: updateData } = useSWR('/api/check-update', fetcher, {
+        refreshInterval: 5000,
+    });
+
+    useEffect(() => {
+        if (!updateData?.lastUpdate || !lastCheckedTimestamp) return;
+
+        const isNewDataAvailable = new Date(updateData.lastUpdate) > new Date(lastCheckedTimestamp);
+
+        if (isNewDataAvailable) {
+            const hasFiltersOrSearch = searchParams.toString().length > 0 && !(searchParams.toString().length === 5 && searchParams.has('page'));
+            const isOnAnotherPage = searchParams.has('page') && searchParams.get('page') !== '1';
+
+            if (!isOnAnotherPage && !hasFiltersOrSearch) {
+                console.log("New data available on page 1 with no filters. Auto-refreshing...");
+                router.refresh();
+            } else {
+                console.log("New data available, but user is interacting. Showing notice.");
+                setShowUpdateNotice(true);
+            }
+        }
+    }, [updateData, lastCheckedTimestamp, router, searchParams]);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -68,12 +100,13 @@ export function PlatesTable({ initialApiData }: PlatesTableProps) {
             current.set("page", "1");
             router.push(`${pathname}?${current.toString()}`, { scroll: false });
         }, 500);
-
         return () => clearTimeout(timer);
-    }, [searchTerm, searchParams, pathname, router]);
+    }, [searchTerm]);
 
     const handleApplyFilters = () => {
         const current = new URLSearchParams(searchParams.toString());
+        if (searchTerm) { current.set('search', searchTerm); }
+        else { current.delete('search'); }
         Object.entries(filters).forEach(([key, value]) => {
             if (value && value !== 'all') {
                 current.set(key, value);
@@ -86,13 +119,29 @@ export function PlatesTable({ initialApiData }: PlatesTableProps) {
     };
 
     const handleClearFilters = () => {
-        setSearchTerm('');
-        setFilters({ make: 'all', color: 'all', year: 'all', mot: 'all', tax: 'all' });
         router.push(pathname, { scroll: false });
-    }
+    };
+
+    const handleShowNewPlates = () => {
+        router.push(pathname);
+    };
+
+    const pagination = initialApiData?.pagination ?? { currentPage: 1, totalPages: 0 };
+    const filterOptions = initialApiData?.filterOptions ?? { makes: [], colors: [], years: [] };
 
     return (
         <div className="space-y-4">
+            <AnimatePresence>
+                {showUpdateNotice && (
+                    <motion.div initial={{ opacity: 0, y: -20, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }} exit={{ opacity: 0, y: -20, height: 0 }}>
+                        <Button className="w-full" onClick={handleShowNewPlates}>
+                            <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                            New Detections Available - Click to Show
+                        </Button>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             <div className="space-y-2">
                 <Input placeholder="Search for a license plate..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="text-base" />
                 <div className="flex flex-wrap items-center gap-2">
@@ -137,40 +186,49 @@ export function PlatesTable({ initialApiData }: PlatesTableProps) {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {plates.length > 0 ? (
-                            plates.map((plate) => (
-                                <TableRow key={plate.id}>
-                                    <TableCell>
-                                        {plate.image_url ? (<img src={plate.image_url} alt={`Capture of ${plate.plate_number}`} className="w-28 h-auto rounded-md object-cover"/>) : (<div className="w-28 h-16 bg-muted rounded-md"/>)}
-                                    </TableCell>
-                                    <TableCell className="align-middle">
-                                        <div className={styles.plateStyle}>{formatPlate(plate.plate_number)}</div>
-                                    </TableCell>
-                                    <TableCell className="align-top pt-3">
-                                        <div className="font-semibold">{plate.car_make || 'N/A'}</div>
-                                        <div className="text-sm text-muted-foreground">{plate.car_color || 'N/A'} • {plate.fuel_type || 'N/A'}</div>
-                                    </TableCell>
-                                    <TableCell className="align-top pt-3">
-                                        <div className={cn(styles.badge, getStatusClass(plate.mot_status))}>{plate.mot_status || 'N/A'}</div>
-                                        {plate.mot_expiry_date && <div className="text-xs text-muted-foreground mt-1">Expires {dayjs(plate.mot_expiry_date).format('DD/MM/YYYY')}</div>}
-                                    </TableCell>
-                                    <TableCell className="align-top pt-3">
-                                        <div className={cn(styles.badge, getStatusClass(plate.tax_status))}>{plate.tax_status || 'N/A'}</div>
-                                        {plate.tax_due_date && <div className="text-xs text-muted-foreground mt-1">Due {dayjs(plate.tax_due_date).format('DD/MM/YYYY')}</div>}
-                                    </TableCell>
-                                    <TableCell className="align-top pt-3">
-                                        <div className="font-semibold">{plate.year_of_manufacture || 'N/A'}</div>
-                                        <div className="text-sm text-muted-foreground">{plate.month_of_first_registration ? `Reg: ${dayjs(plate.month_of_first_registration).format('MMM YYYY')}` : 'N/A'}</div>
-                                    </TableCell>
-                                    <TableCell className="text-left align-top pt-3">
-                                        <div className="font-semibold">{dayjs(plate.recent_capture_time).fromNow()}</div>
-                                        <div className="text-xs text-muted-foreground">{dayjs(plate.recent_capture_time).format('DD/MM/YY HH:mm')}</div>
-                                    </TableCell>
-                                </TableRow>
-                            ))
-                        ) : (
-                            <TableRow><TableCell colSpan={7} className="h-24 text-center">No results found.</TableCell></TableRow>
-                        )}
+                        <AnimatePresence>
+                            {displayedPlates.length > 0 ? (
+                                displayedPlates.map((plate) => (
+                                    <motion.tr
+                                        key={plate.id}
+                                        layoutId={`plate-${plate.id}`}
+                                        initial={{ opacity: 0, y: -20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ duration: 0.3 }}
+                                        className="[&:has([data-state=selected])]:bg-muted"
+                                    >
+                                        <TableCell>
+                                            {plate.image_url ? (<img src={plate.image_url} alt={`Capture of ${plate.plate_number}`} className="w-28 h-auto rounded-md object-cover"/>) : (<div className="w-28 h-16 bg-muted rounded-md"/>)}
+                                        </TableCell>
+                                        <TableCell className="align-middle">
+                                            <div className={styles.plateStyle}>{formatPlate(plate.plate_number)}</div>
+                                        </TableCell>
+                                        <TableCell className="align-top pt-3">
+                                            <div className="font-semibold">{plate.car_make || 'N/A'}</div>
+                                            <div className="text-sm text-muted-foreground">{plate.car_color || 'N/A'} • {plate.fuel_type || 'N/A'}</div>
+                                        </TableCell>
+                                        <TableCell className="align-top pt-3">
+                                            <div className={cn(styles.badge, getStatusClass(plate.mot_status))}>{plate.mot_status || 'N/A'}</div>
+                                            {plate.mot_expiry_date && <div className="text-xs text-muted-foreground mt-1">Expires {dayjs(plate.mot_expiry_date).format('DD/MM/YYYY')}</div>}
+                                        </TableCell>
+                                        <TableCell className="align-top pt-3">
+                                            <div className={cn(styles.badge, getStatusClass(plate.tax_status))}>{plate.tax_status || 'N/A'}</div>
+                                            {plate.tax_due_date && <div className="text-xs text-muted-foreground mt-1">Due {dayjs(plate.tax_due_date).format('DD/MM/YYYY')}</div>}
+                                        </TableCell>
+                                        <TableCell className="align-top pt-3">
+                                            <div className="font-semibold">{plate.year_of_manufacture || 'N/A'}</div>
+                                            <div className="text-sm text-muted-foreground">{plate.month_of_first_registration ? `Reg: ${dayjs(plate.month_of_first_registration).format('MMM YYYY')}` : 'N/A'}</div>
+                                        </TableCell>
+                                        <TableCell className="text-left align-top pt-3">
+                                            <div className="font-semibold">{dayjs(plate.recent_capture_time).fromNow()}</div>
+                                            <div className="text-xs text-muted-foreground">{dayjs(plate.recent_capture_time).format('DD/MM/YY HH:mm')}</div>
+                                        </TableCell>
+                                    </motion.tr>
+                                ))
+                            ) : (
+                                <TableRow><TableCell colSpan={7} className="h-24 text-center">No results found.</TableCell></TableRow>
+                            )}
+                        </AnimatePresence>
                     </TableBody>
                 </Table>
             </div>

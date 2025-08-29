@@ -4,6 +4,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { PlatesApiResponse } from "@/lib/types";
 import { PlatesTable } from "@/components/app/plates-table";
 import { ModeToggle } from "@/components/mode-toggle";
+import pool from "@/lib/db";
 
 interface HomePageProps {
   searchParams: { [key: string]: string | string[] | undefined };
@@ -27,10 +28,23 @@ async function getPlatesData(searchParams: HomePageProps['searchParams']) {
   }
 
   try {
-    const response = await fetch(`${baseUrl}/api/plates?${query}`, { cache: 'no-store' });
-    if (!response.ok) throw new Error(`API responded with ${response.status}`);
-    const data = await response.json();
-    return { data };
+    const platesResponse = await fetch(`${baseUrl}/api/plates?${query}`, { cache: 'no-store' });
+    if (!platesResponse.ok) throw new Error(`API responded with ${platesResponse.status}`);
+
+    const client = await pool.connect();
+    let lastUpdate;
+    try {
+      const stateResult = await client.query('SELECT last_plate_update FROM app_state WHERE id = 1');
+      lastUpdate = stateResult.rows[0]?.last_plate_update || new Date(0).toISOString();
+    } finally {
+      client.release();
+    }
+
+    const platesData: PlatesApiResponse = await platesResponse.json();
+    platesData.lastCheckedTimestamp = lastUpdate;
+
+    return { data: platesData };
+
   } catch (error) {
     console.error("Failed to fetch plates:", error);
     return { error: "Could not connect to the API service." };

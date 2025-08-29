@@ -20,6 +20,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dayjs": "^1.11.15",
+    "framer-motion": "^12.23.12",
     "lucide-react": "^0.541.0",
     "next": "15.5.0",
     "next-auth": "^4.24.11",
@@ -28,6 +29,7 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "recharts": "^3.1.2",
+    "swr": "^2.3.6",
     "tailwind-merge": "^3.3.1",
     "zod": "^4.1.1"
   },
