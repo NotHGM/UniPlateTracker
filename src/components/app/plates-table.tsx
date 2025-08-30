@@ -1,7 +1,7 @@
 // src/components/app/plates-table.tsx
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { LicensePlate, PlatesApiResponse } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -16,7 +16,8 @@ import useSWR from 'swr';
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import styles from "./plates.module.css";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, VideoOff } from "lucide-react";
+import { PlateVideoPlayer } from "./plate-video-player";
 
 dayjs.extend(relativeTime);
 
@@ -27,20 +28,18 @@ interface PlatesTableProps {
     error?: string | null;
     appRegion: 'UK' | 'INTERNATIONAL';
     internationalApiEnabled: boolean;
+    videoCaptureEnabled: boolean;
 }
 
 const formatPlate = (plate: string | null): JSX.Element => {
     if (!plate) return <>{'N/A'}</>;
     plate = plate.replace(/\s/g, '');
-
-    if (plate.length === 7) {
+    if (plate.length >= 7) {
         return <><span>{plate.substring(0, 4)}</span><span>{plate.substring(4)}</span></>;
     }
-
     if (plate.length === 6) {
         return <><span>{plate.substring(0, 3)}</span><span>{plate.substring(3)}</span></>;
     }
-
     return <span>{plate}</span>;
 };
 
@@ -52,20 +51,21 @@ const getStatusClass = (status: string | null): string => {
     return styles.badgeSecondary;
 };
 
-export function PlatesTable({ initialApiData, error, appRegion, internationalApiEnabled }: PlatesTableProps) {
+export function PlatesTable({ initialApiData, error, appRegion, internationalApiEnabled, videoCaptureEnabled }: PlatesTableProps) {
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
 
-    const [filters, setFilters] = useState({
+    const initialFilters = useMemo(() => ({
         search: searchParams.get('search') || '',
         make: searchParams.get('make') || 'all',
         color: searchParams.get('color') || 'all',
         year: searchParams.get('year') || 'all',
         mot: searchParams.get('mot') || 'all',
         tax: searchParams.get('tax') || 'all',
-    });
+    }), [searchParams]);
 
+    const [filters, setFilters] = useState(initialFilters);
     const [displayedPlates, setDisplayedPlates] = useState(initialApiData?.data ?? []);
     const [lastCheckedTimestamp, setLastCheckedTimestamp] = useState(initialApiData?.lastCheckedTimestamp);
     const [showUpdateNotice, setShowUpdateNotice] = useState(false);
@@ -92,16 +92,13 @@ export function PlatesTable({ initialApiData, error, appRegion, internationalApi
     useEffect(() => {
         const timer = setTimeout(() => {
             const current = new URLSearchParams(searchParams.toString());
-            if (filters.search) {
-                current.set("search", filters.search);
-            } else {
-                current.delete("search");
-            }
+            if (filters.search) { current.set("search", filters.search); }
+            else { current.delete("search"); }
             current.set("page", "1");
             router.push(`${pathname}?${current.toString()}`, { scroll: false });
         }, 500);
         return () => clearTimeout(timer);
-    }, [filters.search]);
+    }, [filters.search, pathname, router, searchParams]);
 
     const handleApplyFilters = () => {
         const current = new URLSearchParams(searchParams.toString());
@@ -135,7 +132,6 @@ export function PlatesTable({ initialApiData, error, appRegion, internationalApi
         <div className="space-y-4">
             <div className="p-4 bg-card border rounded-lg space-y-4">
                 <Input placeholder="Search for a license plate..." value={filters.search} onChange={e => setFilters(f => ({ ...f, search: e.target.value }))} className="text-base" />
-
                 {showVehicleDetails && (
                     <div className="flex flex-wrap items-center gap-2">
                         <Select value={filters.make} onValueChange={(v) => setFilters(f => ({ ...f, make: v }))}>
@@ -158,7 +154,7 @@ export function PlatesTable({ initialApiData, error, appRegion, internationalApi
                             <SelectTrigger className="flex-1 min-w-[120px]"><SelectValue placeholder="All Tax" /></SelectTrigger>
                             <SelectContent><SelectItem value="all">All Tax</SelectItem><SelectItem value="Taxed">Taxed</SelectItem><SelectItem value="Not Taxed">Not Taxed</SelectItem></SelectContent>
                         </Select>
-                        <div className="flex-grow"></div> {/* Spacer */}
+                        <div className="flex-grow"></div>
                         <div className="flex gap-2">
                             <Button onClick={handleApplyFilters}>Apply Filters</Button>
                             <Button onClick={handleClearFilters} variant="ghost" className="text-muted-foreground">Clear</Button>
@@ -168,11 +164,7 @@ export function PlatesTable({ initialApiData, error, appRegion, internationalApi
             </div>
 
             <AnimatePresence>
-                {showUpdateNotice && (
-                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="pb-4">
-                        <Button className="w-full" onClick={handleShowNewPlates}><RefreshCw className="mr-2 h-4 w-4 animate-spin" />New Detections Available - Click to Show</Button>
-                    </motion.div>
-                )}
+                {showUpdateNotice && ( <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="pb-4"> <Button className="w-full" onClick={handleShowNewPlates}><RefreshCw className="mr-2 h-4 w-4 animate-spin" />New Detections Available - Click to Show</Button> </motion.div> )}
             </AnimatePresence>
 
             <div className="rounded-lg border bg-card text-card-foreground">
@@ -185,6 +177,7 @@ export function PlatesTable({ initialApiData, error, appRegion, internationalApi
                             {showVehicleDetails && <TableHead>MOT</TableHead>}
                             {showVehicleDetails && <TableHead>Tax</TableHead>}
                             {showVehicleDetails && <TableHead>Registration</TableHead>}
+                            {videoCaptureEnabled && <TableHead>Video</TableHead>}
                             <TableHead className="text-left pr-6">Last Seen</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -213,13 +206,25 @@ export function PlatesTable({ initialApiData, error, appRegion, internationalApi
                                             </>
                                         )}
 
+                                        {videoCaptureEnabled && (
+                                            <TableCell className="align-middle">
+                                                {plate.video_url ? (
+                                                    <PlateVideoPlayer videoUrl={plate.video_url} plateNumber={plate.plate_number} appRegion={appRegion}/>
+                                                ) : (
+                                                    <div className="w-28 aspect-video bg-muted rounded-md flex items-center justify-center">
+                                                        <VideoOff className="w-5 h-5 text-muted-foreground" />
+                                                    </div>
+                                                )}
+                                            </TableCell>
+                                        )}
+
                                         <TableCell className="text-left align-middle pr-6">
                                             <div className="font-semibold">{dayjs(plate.recent_capture_time).fromNow()}</div>
                                             <div className="text-xs text-muted-foreground">{dayjs(plate.recent_capture_time).format('DD/MM/YY HH:mm')}</div>
                                         </TableCell>
                                     </motion.tr>
                                 ))
-                            ) : ( <TableRow><TableCell colSpan={showVehicleDetails ? 7 : 3} className="h-24 text-center">No results found.</TableCell></TableRow> )}
+                            ) : ( <TableRow><TableCell colSpan={showVehicleDetails ? (videoCaptureEnabled ? 8 : 7) : (videoCaptureEnabled ? 4 : 3)} className="h-24 text-center">No results found.</TableCell></TableRow> )}
                         </AnimatePresence>
                     </TableBody>
                 </Table>

@@ -50,6 +50,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const { data, error } = await getPlatesData(searchParams);
 
   const appRegion = process.env.APP_REGION || 'UK';
+  const internationalApiEnabled = process.env.ENABLE_INTERNATIONAL_API === 'true';
+  const videoCaptureEnabled = process.env.ENABLE_VIDEO_CAPTURE === 'true';
 
   return (
       <div className="bg-background min-h-screen">
@@ -70,6 +72,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               initialApiData={data}
               error={error}
               appRegion={appRegion as 'UK' | 'INTERNATIONAL'}
+              internationalApiEnabled={internationalApiEnabled}
+              videoCaptureEnabled={videoCaptureEnabled}
           />
         </main>
       </div>
