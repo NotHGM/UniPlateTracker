@@ -18,11 +18,11 @@ async function initializeDatabase() {
 
         await client.query(`
             CREATE TABLE IF NOT EXISTS license_plates (
-                id SERIAL PRIMARY KEY,
-                plate_number VARCHAR(15) NOT NULL,
+                                                          id SERIAL PRIMARY KEY,
+                                                          plate_number VARCHAR(15) NOT NULL,
                 capture_time TIMESTAMPTZ NOT NULL,
                 recent_capture_time TIMESTAMPTZ NOT NULL,
-                video_url VARCHAR(255),
+                video_url TEXT, -- Use TEXT to be safe with long paths/names
                 car_make VARCHAR(50),
                 car_color VARCHAR(50),
                 fuel_type VARCHAR(50),
@@ -34,21 +34,22 @@ async function initializeDatabase() {
                 month_of_first_registration VARCHAR(7),
                 created_at TIMESTAMPTZ DEFAULT NOW(),
                 updated_at TIMESTAMPTZ DEFAULT NOW()
-            );
+                );
         `);
         console.log('✅ Table "license_plates" is ready.');
 
         await client.query(`
             ALTER TABLE license_plates
-            ADD COLUMN IF NOT EXISTS image_url TEXT;
+                ADD COLUMN IF NOT EXISTS image_url TEXT;
         `);
         console.log('✅ Column "image_url" is ready.');
 
         await client.query(`
             ALTER TABLE license_plates
-            ALTER COLUMN image_url TYPE TEXT;
+            ALTER COLUMN image_url TYPE TEXT,
+            ALTER COLUMN video_url TYPE TEXT;
         `);
-        console.log('✅ Column "image_url" type is set to TEXT.');
+        console.log('✅ Columns "image_url" and "video_url" types are set to TEXT.');
 
         await client.query(`
             CREATE INDEX IF NOT EXISTS idx_plate_number ON license_plates(plate_number);
@@ -57,14 +58,14 @@ async function initializeDatabase() {
 
         await client.query(`
             CREATE TABLE IF NOT EXISTS app_state (
-                id INT PRIMARY KEY DEFAULT 1,
-                last_plate_update TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            );
+                                                     id INT PRIMARY KEY DEFAULT 1,
+                                                     last_plate_update TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
         `);
         await client.query(`
             INSERT INTO app_state (id, last_plate_update)
             VALUES (1, NOW())
-            ON CONFLICT (id) DO NOTHING;
+                ON CONFLICT (id) DO NOTHING;
         `);
         console.log('✅ Table "app_state" for live updates is ready.');
 
@@ -72,20 +73,20 @@ async function initializeDatabase() {
 
         await client.query(`
             CREATE TABLE IF NOT EXISTS approved_emails (
-                id SERIAL PRIMARY KEY,
-                email VARCHAR(255) UNIQUE NOT NULL,
+                                                           id SERIAL PRIMARY KEY,
+                                                           email VARCHAR(255) UNIQUE NOT NULL,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            );
+                );
         `);
         console.log('✅ Table "approved_emails" is ready.');
 
         await client.query(`
             CREATE TABLE IF NOT EXISTS admin_users (
-                id SERIAL PRIMARY KEY,
-                email VARCHAR(255) UNIQUE NOT NULL,
+                                                       id SERIAL PRIMARY KEY,
+                                                       email VARCHAR(255) UNIQUE NOT NULL,
                 password_hash VARCHAR(255) NOT NULL,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            );
+                );
         `);
         console.log('✅ Table "admin_users" is ready.');
 

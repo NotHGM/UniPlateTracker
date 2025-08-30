@@ -4,6 +4,7 @@ import { Pool } from 'pg';
 import path from 'path';
 import dotenv from 'dotenv';
 import axios from 'axios';
+import { videoCapture } from './video-capture';
 
 // --- Configuration ---
 dotenv.config({ path: path.resolve(__dirname, '../../.env.local') });
@@ -14,6 +15,7 @@ const {
     DVLA_API_KEY,
     APP_REGION = 'UK', // Default to UK if not set
     ENABLE_INTERNATIONAL_API,
+    ENABLE_VIDEO_CAPTURE // This line was missing
 } = process.env;
 
 if (!POSTGRES_URL || !WORKER_PORT) {
@@ -72,46 +74,38 @@ async function getInternationalVehicleDetails(plateNumber: string): Promise<Vehi
     return null;
 }
 
-// Database logic, now handles nullable details
+// Function now accepts an optional videoUrl parameter
 async function processPlateData(
     plateNumber: string,
     thumbnailBase64: string | undefined,
-    details: VehicleDetails | null // Accepts null
+    details: VehicleDetails | null,
+    videoUrl: string | null
 ) {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
-
         const captureTime = new Date();
         const existingPlate = await client.query('SELECT id FROM license_plates WHERE plate_number = $1', [plateNumber]);
 
         if (existingPlate.rows.length > 0) {
             const plateId = existingPlate.rows[0].id;
-            if (details) {
-                // Update with full vehicle details if available
-                await client.query(
-                    `UPDATE license_plates SET 
-                        recent_capture_time = $1, image_url = $2, car_make = $3, car_color = $4, fuel_type = $5,
-                        mot_status = $6, tax_status = $7, mot_expiry_date = $8, tax_due_date = $9, 
-                        year_of_manufacture = $10, month_of_first_registration = $11, updated_at = NOW() 
-                    WHERE id = $12`,
-                    [captureTime, thumbnailBase64, details.make, details.colour, details.fuelType, details.motStatus, details.taxStatus, details.motExpiryDate || null, details.taxDueDate || null, details.yearOfManufacture, details.monthOfFirstRegistration || null, plateId]
-                );
-                console.log(`[${plateNumber}] Updated record in database with new details.`);
-            } else {
-                // Update only time and image if no details are available
-                await client.query('UPDATE license_plates SET recent_capture_time = $1, image_url = $2, updated_at = NOW() WHERE id = $3', [captureTime, thumbnailBase64, plateId]);
-                console.log(`[${plateNumber}] Updated record in database without new details.`);
-            }
+            await client.query(
+                `UPDATE license_plates SET
+                                           recent_capture_time = $1, image_url = $2, video_url = $3, car_make = $4, car_color = $5,
+                                           fuel_type = $6, mot_status = $7, tax_status = $8, mot_expiry_date = $9,
+                                           tax_due_date = $10, year_of_manufacture = $11, month_of_first_registration = $12, updated_at = NOW()
+                 WHERE id = $13`,
+                [captureTime, thumbnailBase64, videoUrl, details?.make, details?.colour, details?.fuelType, details?.motStatus, details?.taxStatus, details?.motExpiryDate, details?.taxDueDate, details?.yearOfManufacture, details?.monthOfFirstRegistration, plateId]
+            );
+            console.log(`[${plateNumber}] Updated record in database.`);
         } else {
-            // Insert new record with details if available, otherwise with nulls
             await client.query(
                 `INSERT INTO license_plates (
-                    plate_number, capture_time, recent_capture_time, image_url, 
-                    car_make, car_color, fuel_type, mot_status, tax_status, 
+                    plate_number, capture_time, recent_capture_time, image_url, video_url,
+                    car_make, car_color, fuel_type, mot_status, tax_status,
                     mot_expiry_date, tax_due_date, year_of_manufacture, month_of_first_registration
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-                [plateNumber, captureTime, captureTime, thumbnailBase64, details?.make, details?.colour, details?.fuelType, details?.motStatus, details?.taxStatus, details?.motExpiryDate, details?.taxDueDate, details?.yearOfManufacture, details?.monthOfFirstRegistration]
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+                [plateNumber, captureTime, captureTime, thumbnailBase64, videoUrl, details?.make, details?.colour, details?.fuelType, details?.motStatus, details?.taxStatus, details?.motExpiryDate, details?.taxDueDate, details?.yearOfManufacture, details?.monthOfFirstRegistration]
             );
             console.log(`[${plateNumber}] Created new record in database.`);
         }
@@ -130,6 +124,9 @@ const app = express();
 app.use(express.json({ limit: '10mb' }));
 
 app.post('/webhook', async (req, res) => {
+    // Acknowledge the request immediately so UniFi doesn't time out
+    res.status(200).send('Webhook received and acknowledged.');
+
     const payload = req.body;
     console.log(`\n--- LPR Webhook Received (Region: ${APP_REGION}) ---`);
 
@@ -139,33 +136,40 @@ app.post('/webhook', async (req, res) => {
         const thumbnail = payload?.alarm?.thumbnail;
         console.log(`SUCCESS: Extracted Plate: ${sanitizedPlate}`);
 
+        let proceedToSave = false;
+        let vehicleDetails: VehicleDetails | null = null;
+
         if (APP_REGION === 'UK') {
-            // In UK mode, we use the DVLA API as a strict validator.
-            const vehicleDetails = await getVehicleDetailsFromDVLA(sanitizedPlate);
+            vehicleDetails = await getVehicleDetailsFromDVLA(sanitizedPlate);
             if (vehicleDetails) {
-                // If details are found, the plate is valid. Proceed to save.
-                console.log(`[${sanitizedPlate}] Plate is valid, proceeding to save details to database.`);
-                await processPlateData(sanitizedPlate, thumbnail, vehicleDetails);
+                proceedToSave = true;
             } else {
-                // If NO details are found, it's a false positive. Do NOTHING.
                 console.log(`[${sanitizedPlate}] Plate rejected by DVLA validation. IGNORING ENTRY.`);
             }
         } else {
-            // In INTERNATIONAL mode, we save the detection regardless of API success.
-            let vehicleDetails: VehicleDetails | null = null;
+            proceedToSave = true;
             if (ENABLE_INTERNATIONAL_API === 'true') {
                 vehicleDetails = await getInternationalVehicleDetails(sanitizedPlate);
             }
-            console.log(`[${sanitizedPlate}] Saving detection for INTERNATIONAL region.`);
-            await processPlateData(sanitizedPlate, thumbnail, vehicleDetails);
         }
 
+        if (proceedToSave) {
+            let videoUrl: string | null = null;
+            if (ENABLE_VIDEO_CAPTURE === 'true') {
+                console.log(`[${sanitizedPlate}] Event is valid, triggering video capture...`);
+                videoUrl = await videoCapture.captureClip(sanitizedPlate);
+            }
+            await processPlateData(sanitizedPlate, thumbnail, vehicleDetails, videoUrl);
+        }
     } else {
-        console.warn("Webhook received, but no plate data was found.");
+        console.warn("Webhook received, but no plate data was not found.");
     }
-    res.status(200).send('Webhook received and acknowledged.');
 });
 
 app.listen(port, () => {
     console.log(`Worker listening for UniFi Protect LPR webhooks on port ${port}`);
+    // Start the video buffer if enabled
+    if (ENABLE_VIDEO_CAPTURE === 'true') {
+        videoCapture.start();
+    }
 });
