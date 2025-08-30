@@ -58,3 +58,7 @@ pnpm-debug.log*
 # Misc
 ._uniplatetracker
 /uniplatetracker
+
+# --- Temporary Video Segments ---
+# Ignore the temporary video segments created by the video capture worker
+/worker/temp_segments/
