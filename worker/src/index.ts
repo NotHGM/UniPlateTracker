@@ -6,16 +6,15 @@ import dotenv from 'dotenv';
 import axios from 'axios';
 import { videoCapture } from './video-capture';
 
-// --- Configuration ---
 dotenv.config({ path: path.resolve(__dirname, '../../.env.local') });
 
 const {
     POSTGRES_URL,
     WORKER_PORT,
     DVLA_API_KEY,
-    APP_REGION = 'UK', // Default to UK if not set
+    APP_REGION = 'UK',
     ENABLE_INTERNATIONAL_API,
-    ENABLE_VIDEO_CAPTURE // This line was missing
+    ENABLE_VIDEO_CAPTURE
 } = process.env;
 
 if (!POSTGRES_URL || !WORKER_PORT) {
@@ -42,13 +41,9 @@ interface VehicleDetails {
     monthOfFirstRegistration: string;
 }
 
-// DVLA API Logic
 async function getVehicleDetailsFromDVLA(plateNumber: string): Promise<VehicleDetails | null> {
     const apiUrl = 'https://driver-vehicle-licensing.api.gov.uk/vehicle-enquiry/v1/vehicles';
-    const headers = {
-        'x-api-key': DVLA_API_KEY,
-        'Content-Type': 'application/json',
-    };
+    const headers = { 'x-api-key': DVLA_API_KEY, 'Content-Type': 'application/json' };
     const data = { registrationNumber: plateNumber };
 
     try {
@@ -74,7 +69,6 @@ async function getInternationalVehicleDetails(plateNumber: string): Promise<Vehi
     return null;
 }
 
-// Function now accepts an optional videoUrl parameter
 async function processPlateData(
     plateNumber: string,
     thumbnailBase64: string | undefined,
@@ -90,19 +84,19 @@ async function processPlateData(
         if (existingPlate.rows.length > 0) {
             const plateId = existingPlate.rows[0].id;
             await client.query(
-                `UPDATE license_plates SET
-                                           recent_capture_time = $1, image_url = $2, video_url = $3, car_make = $4, car_color = $5,
-                                           fuel_type = $6, mot_status = $7, tax_status = $8, mot_expiry_date = $9,
-                                           tax_due_date = $10, year_of_manufacture = $11, month_of_first_registration = $12, updated_at = NOW()
-                 WHERE id = $13`,
+                `UPDATE license_plates SET 
+                    recent_capture_time = $1, image_url = $2, video_url = $3, car_make = $4, car_color = $5,
+                    fuel_type = $6, mot_status = $7, tax_status = $8, mot_expiry_date = $9, 
+                    tax_due_date = $10, year_of_manufacture = $11, month_of_first_registration = $12, updated_at = NOW() 
+                WHERE id = $13`,
                 [captureTime, thumbnailBase64, videoUrl, details?.make, details?.colour, details?.fuelType, details?.motStatus, details?.taxStatus, details?.motExpiryDate, details?.taxDueDate, details?.yearOfManufacture, details?.monthOfFirstRegistration, plateId]
             );
             console.log(`[${plateNumber}] Updated record in database.`);
         } else {
             await client.query(
                 `INSERT INTO license_plates (
-                    plate_number, capture_time, recent_capture_time, image_url, video_url,
-                    car_make, car_color, fuel_type, mot_status, tax_status,
+                    plate_number, capture_time, recent_capture_time, image_url, video_url, 
+                    car_make, car_color, fuel_type, mot_status, tax_status, 
                     mot_expiry_date, tax_due_date, year_of_manufacture, month_of_first_registration
                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
                 [plateNumber, captureTime, captureTime, thumbnailBase64, videoUrl, details?.make, details?.colour, details?.fuelType, details?.motStatus, details?.taxStatus, details?.motExpiryDate, details?.taxDueDate, details?.yearOfManufacture, details?.monthOfFirstRegistration]
@@ -124,7 +118,6 @@ const app = express();
 app.use(express.json({ limit: '10mb' }));
 
 app.post('/webhook', async (req, res) => {
-    // Acknowledge the request immediately so UniFi doesn't time out
     res.status(200).send('Webhook received and acknowledged.');
 
     const payload = req.body;
@@ -156,20 +149,18 @@ app.post('/webhook', async (req, res) => {
         if (proceedToSave) {
             let videoUrl: string | null = null;
             if (ENABLE_VIDEO_CAPTURE === 'true') {
-                console.log(`[${sanitizedPlate}] Event is valid, triggering video capture...`);
                 videoUrl = await videoCapture.captureClip(sanitizedPlate);
             }
             await processPlateData(sanitizedPlate, thumbnail, vehicleDetails, videoUrl);
         }
     } else {
-        console.warn("Webhook received, but no plate data was not found.");
+        console.warn("Webhook received, but no plate data was found.");
     }
 });
 
 app.listen(port, () => {
     console.log(`Worker listening for UniFi Protect LPR webhooks on port ${port}`);
-    // Start the video buffer if enabled
     if (ENABLE_VIDEO_CAPTURE === 'true') {
-        videoCapture.start();
+        console.log('📹 On-demand video capture is enabled.');
     }
 });
