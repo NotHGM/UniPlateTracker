@@ -16,9 +16,7 @@ async function getPlatesData(searchParams: HomePageProps['searchParams']) {
       cleanParams[key] = value;
     }
   }
-
   const query = new URLSearchParams(cleanParams).toString();
-
   const baseUrl = process.env.NEXTAUTH_URL;
 
   if (!baseUrl) {
@@ -42,7 +40,6 @@ async function getPlatesData(searchParams: HomePageProps['searchParams']) {
     platesData.lastCheckedTimestamp = lastUpdate;
 
     return { data: platesData };
-
   } catch (error) {
     console.error("Failed to fetch plates:", error);
     return { error: "Could not connect to the API service." };
@@ -51,6 +48,8 @@ async function getPlatesData(searchParams: HomePageProps['searchParams']) {
 
 export default async function HomePage({ searchParams }: HomePageProps) {
   const { data, error } = await getPlatesData(searchParams);
+
+  const appRegion = process.env.APP_REGION || 'UK';
 
   return (
       <div className="bg-background min-h-screen">
@@ -70,6 +69,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           <PlatesTable
               initialApiData={data}
               error={error}
+              appRegion={appRegion as 'UK' | 'INTERNATIONAL'}
           />
         </main>
       </div>

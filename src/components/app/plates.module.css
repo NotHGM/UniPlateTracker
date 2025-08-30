@@ -1,19 +1,36 @@
-.plateStyle {
+/* src/components/app/plates.module.css */
+
+/* --- Minimal UK Plate Style --- */
+.ukPlateStyle {
     font-family: var(--font-charles-wright);
     background-color: #FBBF24; /* amber-400 */
     color: #000000;
     padding: 0.2rem 0.75rem;
     border-radius: 0.3rem;
-    border: 2px solid #374151; /* gray-700 */
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4em; /* The space in the middle of the plate */
+    border: 1px solid #737373; /* neutral-500 */
+    display: inline-block;
     text-transform: uppercase;
     font-weight: 700;
-    font-size: 1.125rem; /* text-lg */
-    line-height: 1.75rem;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-    white-space: nowrap; /* Prevents text from wrapping on small screens */
+    font-size: 1rem;
+    line-height: 1.5rem;
+    white-space: nowrap;
+}
+
+/* --- American-Style International Plate --- */
+.intlPlateStyle {
+    font-family: 'Helvetica', sans-serif; /* A more standard font */
+    background: linear-gradient(to bottom, #FFFFFF, #E5E5E5); /* White gradient */
+    color: #172554; /* Dark Blue text */
+    padding: 0.2rem 0.75rem;
+    border-radius: 0.3rem;
+    border: 1px solid #D4D4D4; /* neutral-300 */
+    display: inline-block;
+    text-transform: uppercase;
+    font-weight: 700;
+    font-size: 1rem;
+    line-height: 1.5rem;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    white-space: nowrap;
 }
 
 /* Base styles for all status badges */
@@ -32,6 +49,11 @@
 .badgeSuccess {
     background-color: var(--success);
     color: var(--success-foreground);
+}
+
+.badgeDestructive {
+    background-color: var(--destructive);
+    color: var(--destructive-foreground);
 }
 
 /* Secondary/neutral badge for "No details" and other states */
