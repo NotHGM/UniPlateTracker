@@ -1,13 +1,11 @@
-// src/components/admin/dashboard-client.tsx
 "use client"
 
 import { Car, Palette, Timer, Fingerprint } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatCard } from "./stat-card";
+import { AdminManagement } from "./admin-management";
 import { Bar, BarChart, ResponsiveContainer, XAxis, Tooltip, CartesianGrid } from 'recharts';
-
-// --- DEFINITIONS FOR THE BEAUTIFUL CHART ---
 
 interface HourlyData {
     name: string;
@@ -67,50 +65,43 @@ const DetectionsChart = ({ data }: { data: HourlyData[] }) => {
     );
 };
 
-
-// The Dashboard Client component that brings everything together
-export function DashboardClient({ stats }: { stats: any }) {
+export function DashboardClient({ stats, currentUserEmail }: { stats: any, currentUserEmail: string }) {
 
     if (!stats) {
-        // Show a full card skeleton if stats are not yet loaded
         return (
-            <Card>
-                <CardHeader>
-                    <CardTitle>Detections in the Last 24 Hours</CardTitle>
-                </CardHeader>
-                <CardContent className="pl-2">
-                    <Skeleton className="w-full h-[300px]" />
-                </CardContent>
-            </Card>
+            <div className="space-y-6">
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+                    <Skeleton className="h-[126px]" />
+                    <Skeleton className="h-[126px]" />
+                    <Skeleton className="h-[126px]" />
+                    <Skeleton className="h-[126px]" />
+                    <Skeleton className="h-[126px]" />
+                </div>
+                <Skeleton className="h-[400px]" />
+            </div>
         );
     }
 
-    const processHourlyData = (data: { hour: string; count: number }[]) => {
+    const processHourlyData = (data: { hour: string; count: number }[] | undefined) => {
         const hourlyMap = new Map<string, number>();
         for (let i = 0; i < 24; i++) {
             const hour = i.toString().padStart(2, '0');
             hourlyMap.set(hour, 0);
         }
 
-        // Check if data is valid before processing
         if (data && Array.isArray(data)) {
             data.forEach(item => {
-                // --- THIS IS THE FIX ---
-                // We check that 'item' exists and that 'item.hour' is a string before using it.
-                // This prevents the "reading 'substring' of undefined" error.
                 if (item && typeof item.hour === 'string') {
                     const hourKey = item.hour.substring(0, 2);
-                    // Ensure the key is a valid hour before setting
                     if (hourlyMap.has(hourKey)) {
                         hourlyMap.set(hourKey, item.count);
                     }
                 }
-                // Silently ignore bad data items
             });
         }
 
         return Array.from(hourlyMap.entries())
-            .map(([hour, count]) => ({ name: hour, count: count }))
+            .map(([hour, count]) => ({ name: hour, count: count })) // Convert 'hour' to 'name' for the chart
             .sort((a, b) => a.name.localeCompare(b.name));
     };
 
@@ -127,6 +118,8 @@ export function DashboardClient({ stats }: { stats: any }) {
             </div>
 
             <DetectionsChart data={processedChartData} />
+
+            <AdminManagement currentUserEmail={currentUserEmail} />
         </div>
     )
 }

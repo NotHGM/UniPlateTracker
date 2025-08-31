@@ -12,17 +12,17 @@ import { ArrowLeft } from 'lucide-react';
 async function getStatsData() {
     const baseUrl = process.env.NEXTAUTH_URL;
     if (!baseUrl) {
-        return { error: "Configuration error: NEXTAUTH_URL is not set." };
+        console.error("Configuration error: NEXTAUTH_URL is not set.");
+        return { error: "Server configuration is incomplete." };
     }
 
     try {
         const response = await fetch(`${baseUrl}/api/admin/stats`, { cache: 'no-store' });
         if (!response.ok) throw new Error(`API responded with ${response.status}`);
-        const data = await response.json();
-        return { data };
+        return { data: await response.json() };
     } catch (error) {
         console.error("Failed to fetch stats:", error);
-        return { error: "Could not connect to the API service." };
+        return { error: "Could not connect to the statistics API." };
     }
 }
 
@@ -54,11 +54,11 @@ export default async function AdminDashboardPage() {
                 </div>
                 {error ? (
                     <Alert variant="destructive">
-                        <AlertTitle>Error</AlertTitle>
+                        <AlertTitle>Error Loading Dashboard</AlertTitle>
                         <AlertDescription>{error}</AlertDescription>
                     </Alert>
                 ) : (
-                    <DashboardClient stats={data} />
+                    <DashboardClient stats={data} currentUserEmail={session.user.email} />
                 )}
             </main>
         </div>

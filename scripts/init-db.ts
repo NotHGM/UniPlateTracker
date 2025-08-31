@@ -22,7 +22,8 @@ async function initializeDatabase() {
                                                           plate_number VARCHAR(15) NOT NULL,
                 capture_time TIMESTAMPTZ NOT NULL,
                 recent_capture_time TIMESTAMPTZ NOT NULL,
-                video_url TEXT, -- Use TEXT to be safe with long paths/names
+                image_url TEXT,
+                video_url TEXT,
                 car_make VARCHAR(50),
                 car_color VARCHAR(50),
                 fuel_type VARCHAR(50),
@@ -39,19 +40,6 @@ async function initializeDatabase() {
         console.log('✅ Table "license_plates" is ready.');
 
         await client.query(`
-            ALTER TABLE license_plates
-                ADD COLUMN IF NOT EXISTS image_url TEXT;
-        `);
-        console.log('✅ Column "image_url" is ready.');
-
-        await client.query(`
-            ALTER TABLE license_plates
-            ALTER COLUMN image_url TYPE TEXT,
-            ALTER COLUMN video_url TYPE TEXT;
-        `);
-        console.log('✅ Columns "image_url" and "video_url" types are set to TEXT.');
-
-        await client.query(`
             CREATE INDEX IF NOT EXISTS idx_plate_number ON license_plates(plate_number);
         `);
         console.log('✅ Index on "plate_number" is ready.');
@@ -65,20 +53,11 @@ async function initializeDatabase() {
         await client.query(`
             INSERT INTO app_state (id, last_plate_update)
             VALUES (1, NOW())
-                ON CONFLICT (id) DO NOTHING;
+            ON CONFLICT (id) DO NOTHING;
         `);
         console.log('✅ Table "app_state" for live updates is ready.');
 
         console.log('\n🔐 Setting up admin authentication tables...');
-
-        await client.query(`
-            CREATE TABLE IF NOT EXISTS approved_emails (
-                                                           id SERIAL PRIMARY KEY,
-                                                           email VARCHAR(255) UNIQUE NOT NULL,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                );
-        `);
-        console.log('✅ Table "approved_emails" is ready.');
 
         await client.query(`
             CREATE TABLE IF NOT EXISTS admin_users (
@@ -89,6 +68,29 @@ async function initializeDatabase() {
                 );
         `);
         console.log('✅ Table "admin_users" is ready.');
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS approved_emails (
+                id SERIAL PRIMARY KEY,
+                email VARCHAR(255) UNIQUE NOT NULL,
+                -- Tracks who added this email, referencing the admin_users table.
+                added_by INTEGER REFERENCES admin_users(id) ON DELETE SET NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+        `);
+        console.log('✅ Table "approved_emails" is ready with hierarchy support.');
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS admin_activity_log (
+                                                              id SERIAL PRIMARY KEY,
+                                                              timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                actor_user_id INTEGER REFERENCES admin_users(id) ON DELETE SET NULL,
+                action_type VARCHAR(50) NOT NULL,
+                target_email VARCHAR(255) NOT NULL,
+                details JSONB
+                );
+        `);
+        console.log('✅ Table "admin_activity_log" for audit trails is ready.');
 
         await client.query('COMMIT');
         console.log('🎉 Database schema setup complete!');
@@ -104,7 +106,7 @@ async function initializeDatabase() {
             const emailResponse = await prompts({
                 type: 'text',
                 name: 'email',
-                message: 'Enter the email address for the approved admin user:',
+                message: 'Enter the email address for the root admin user:',
                 validate: value => /^\S+@\S+\.\S+$/.test(value) ? true : `Please enter a valid email.`
             });
 
