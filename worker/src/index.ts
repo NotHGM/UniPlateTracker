@@ -1,12 +1,12 @@
 // worker/src/index.ts
+
+import dotenv from 'dotenv';
+import path from 'path';
+dotenv.config({ path: path.resolve(__dirname, '../../.env.local') });
 import express = require('express');
 import { Pool } from 'pg';
-import path from 'path';
-import dotenv from 'dotenv';
 import axios from 'axios';
-import { videoCapture } from './video-capture';
-
-dotenv.config({ path: path.resolve(__dirname, '../../.env.local') });
+import { captureVideo } from './video-capture';
 
 const {
     POSTGRES_URL,
@@ -84,19 +84,19 @@ async function processPlateData(
         if (existingPlate.rows.length > 0) {
             const plateId = existingPlate.rows[0].id;
             await client.query(
-                `UPDATE license_plates SET 
-                    recent_capture_time = $1, image_url = $2, video_url = $3, car_make = $4, car_color = $5,
-                    fuel_type = $6, mot_status = $7, tax_status = $8, mot_expiry_date = $9, 
-                    tax_due_date = $10, year_of_manufacture = $11, month_of_first_registration = $12, updated_at = NOW() 
-                WHERE id = $13`,
+                `UPDATE license_plates SET
+                                           recent_capture_time = $1, image_url = $2, video_url = $3, car_make = $4, car_color = $5,
+                                           fuel_type = $6, mot_status = $7, tax_status = $8, mot_expiry_date = $9,
+                                           tax_due_date = $10, year_of_manufacture = $11, month_of_first_registration = $12, updated_at = NOW()
+                 WHERE id = $13`,
                 [captureTime, thumbnailBase64, videoUrl, details?.make, details?.colour, details?.fuelType, details?.motStatus, details?.taxStatus, details?.motExpiryDate, details?.taxDueDate, details?.yearOfManufacture, details?.monthOfFirstRegistration, plateId]
             );
             console.log(`[${plateNumber}] Updated record in database.`);
         } else {
             await client.query(
                 `INSERT INTO license_plates (
-                    plate_number, capture_time, recent_capture_time, image_url, video_url, 
-                    car_make, car_color, fuel_type, mot_status, tax_status, 
+                    plate_number, capture_time, recent_capture_time, image_url, video_url,
+                    car_make, car_color, fuel_type, mot_status, tax_status,
                     mot_expiry_date, tax_due_date, year_of_manufacture, month_of_first_registration
                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
                 [plateNumber, captureTime, captureTime, thumbnailBase64, videoUrl, details?.make, details?.colour, details?.fuelType, details?.motStatus, details?.taxStatus, details?.motExpiryDate, details?.taxDueDate, details?.yearOfManufacture, details?.monthOfFirstRegistration]
@@ -120,8 +120,10 @@ app.use(express.json({ limit: '10mb' }));
 app.post('/webhook', async (req, res) => {
     res.status(200).send('Webhook received and acknowledged.');
 
+    const eventTime = new Date();
     const payload = req.body;
-    console.log(`\n--- LPR Webhook Received (Region: ${APP_REGION}) ---`);
+
+    console.log(`\n--- LPR Webhook Received at ${eventTime.toLocaleTimeString()} (Region: ${APP_REGION}) ---`);
 
     const plateNumber = payload?.alarm?.triggers?.[0]?.value;
     if (plateNumber) {
@@ -149,7 +151,13 @@ app.post('/webhook', async (req, res) => {
         if (proceedToSave) {
             let videoUrl: string | null = null;
             if (ENABLE_VIDEO_CAPTURE === 'true') {
-                videoUrl = await videoCapture.captureClip(sanitizedPlate);
+                try {
+                    videoUrl = await captureVideo(sanitizedPlate, eventTime);
+                    console.log(`[${sanitizedPlate}] 🎥 Video capture successful: ${videoUrl}`);
+                } catch (error) {
+                    console.error(`[${sanitizedPlate}] 🔴 Video capture FAILED. Proceeding to save DB record without video.`, error);
+                    videoUrl = null;
+                }
             }
             await processPlateData(sanitizedPlate, thumbnail, vehicleDetails, videoUrl);
         }

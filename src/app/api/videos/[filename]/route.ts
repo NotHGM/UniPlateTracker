@@ -1,88 +1,60 @@
 // src/app/api/videos/[filename]/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
+import { stat, createReadStream } from 'fs';
+import { promisify } from 'util';
 import path from 'path';
-import { spawn } from 'child_process';
-import os from 'os';
 
-export const dynamic = 'force-dynamic';
+const statAsync = promisify(stat);
 
-async function generateThumbnail(videoPath: string): Promise<Buffer> {
-    const tempThumbPath = path.join(os.tmpdir(), `thumb-${Date.now()}.jpg`);
-
-    return new Promise((resolve, reject) => {
-        const ffmpeg = spawn('ffmpeg', [
-            '-i', videoPath,
-            '-ss', '00:00:00.500',
-            '-vframes', '1',
-            '-vf', 'scale=320:-1',
-            '-q:v', '4',
-            '-f', 'image2',
-            tempThumbPath
-        ]);
-
-        let errorOutput = '';
-        ffmpeg.stderr.on('data', (data) => {
-            errorOutput += data.toString();
-        });
-
-        ffmpeg.on('close', async (code) => {
-            if (code === 0) {
-                try {
-                    const thumbBuffer = await fs.readFile(tempThumbPath);
-                    await fs.unlink(tempThumbPath);
-                    resolve(thumbBuffer);
-                } catch (readError) {
-                    reject(readError);
-                }
-            } else {
-                reject(new Error(`FFmpeg exited with code ${code}. Stderr: ${errorOutput}`));
-            }
-        });
-
-        ffmpeg.on('error', (err) => reject(err));
+function streamFile(fullPath: string, fileStat: any): NextResponse {
+    const stream = createReadStream(fullPath);
+    return new NextResponse(stream as any, {
+        status: 200,
+        headers: {
+            'Content-Type': 'video/mp4',
+            'Content-Length': fileStat.size.toString(),
+            'Content-Disposition': `inline; filename="${path.basename(fullPath)}"`,
+            'Accept-Ranges': 'bytes',
+        },
     });
 }
 
 export async function GET(
-    request: NextRequest,
+    req: NextRequest,
     { params }: { params: { filename: string } }
 ) {
-    const { searchParams } = new URL(request.url);
-    const wantsThumbnail = searchParams.get('thumbnail') === 'true';
+    const videoCapturePath = process.env.VIDEO_FINAL_CAPTURE_PATH;
 
-    const videoPath = process.env.VIDEO_CAPTURE_PATH;
-
-    if (!videoPath) {
-        return new NextResponse("Server configuration error", { status: 500 });
+    if (!videoCapturePath) {
+        console.error('FATAL: VIDEO_FINAL_CAPTURE_PATH environment variable is not set in the Next.js process!');
+        return new NextResponse(JSON.stringify({ error: 'Video capture path is not configured on the server.' }), { status: 500 });
     }
 
+    const filename = params.filename;
+    const sanitizedFilename = path.basename(filename);
+    if (sanitizedFilename !== filename) {
+        return new NextResponse(JSON.stringify({ error: 'Invalid filename' }), { status: 400 });
+    }
+
+    const fullPath = path.join(videoCapturePath, sanitizedFilename);
+
     try {
-        const filename = params.filename;
-        const sanitizedFilename = path.basename(filename);
-        if (sanitizedFilename !== filename) {
-            return new NextResponse("Invalid filename", { status: 400 });
-        }
+        const fileStat = await statAsync(fullPath);
 
-        const fullPath = path.join(videoPath, sanitizedFilename);
-        await fs.access(fullPath);
-
-        if (wantsThumbnail) {
-            const thumbBuffer = await generateThumbnail(fullPath);
-            return new NextResponse(thumbBuffer, {
-                status: 200,
-                headers: { 'Content-Type': 'image/jpeg' },
-            });
+        if (fileStat.isFile()) {
+            return streamFile(fullPath, fileStat);
         } else {
-            const videoBuffer = await fs.readFile(fullPath);
-            return new NextResponse(videoBuffer, {
-                status: 200,
-                headers: { 'Content-Type': 'video/mp4', 'Content-Length': videoBuffer.length.toString() },
-            });
+            return new NextResponse(JSON.stringify({ error: 'Requested resource is not a file.' }), { status: 404 });
         }
-
-    } catch (error) {
-        console.error(`Error serving media for ${params.filename}:`, error);
-        return new NextResponse("Media not found or unreadable", { status: 404 });
+    } catch (error: any) {
+        if (error.code === 'ENOENT') {
+            return new NextResponse(JSON.stringify({ error: 'Video file not found.' }), { status: 404 });
+        } else if (error.code === 'EACCES') {
+            console.error(`Permission denied error when trying to access: ${fullPath}`);
+            return new NextResponse(JSON.stringify({ error: 'Permission denied to access video file.' }), { status: 500 });
+        }
+        console.error('An unhandled error occurred in the video API route:', error);
+        return new NextResponse(JSON.stringify({ error: 'An internal server error occurred.' }), { status: 500 });
     }
 }

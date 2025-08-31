@@ -1,92 +1,91 @@
 // worker/src/video-capture.ts
-import { spawn } from 'child_process';
-import { promises as fs } from 'fs';
-import path from 'path';
-import dotenv from 'dotenv';
 
+import dotenv from 'dotenv';
+import path from 'path';
 dotenv.config({ path: path.resolve(__dirname, '../../.env.local') });
 
-// Get configuration from environment variables
-const {
-    RTSP_URL,
-    VIDEO_CAPTURE_PATH,
-    VIDEO_CAPTURE_DURATION = '15',
-} = process.env;
+import { spawn } from 'child_process';
+import { writeFile, readdir, unlink } from 'fs/promises';
 
-class VideoCapture {
-    private isCapturing = false;
+const bufferPath = process.env.VIDEO_BUFFER_PATH!;
+const finalCapturePath = process.env.VIDEO_FINAL_CAPTURE_PATH!;
+const captureDuration = parseInt(process.env.VIDEO_CAPTURE_DURATION || '15', 10);
 
-    /**
-     * Connects to the RTSP stream and records a single clip for a fixed duration.
-     * @param plateNumber The license plate number, used for the filename.
-     * @returns The filename of the captured clip, or null if an error occurred.
-     */
-    public async captureClip(plateNumber: string): Promise<string | null> {
-        if (!RTSP_URL || !VIDEO_CAPTURE_PATH) {
-            console.error("Video Capture disabled: RTSP_URL or VIDEO_CAPTURE_PATH is not set in .env.local.");
-            return null;
+const PRE_EVENT_SECONDS = 10;
+const POST_EVENT_SECONDS = 5;
+
+const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+
+export async function captureVideo(plate: string, eventTime: Date): Promise<string> {
+    const finalFilename = `${plate}_${eventTime.toISOString().replace(/:/g, '-')}.mp4`;
+    const finalOutputPath = path.join(finalCapturePath, finalFilename);
+
+    console.log(`🎬 Initializing video capture for plate: ${plate}`);
+
+    try {
+        await delay(POST_EVENT_SECONDS * 1000 + 2000);
+
+        const allSegments = await readdir(bufferPath);
+        const relevantSegments = allSegments
+            .filter(f => f.startsWith('segment_') && f.endsWith('.mp4'))
+            .sort();
+
+        if (relevantSegments.length < 2) {
+            throw new Error('Not enough video segments in buffer to create a clip. Is buffer-manager running?');
         }
 
-        if (this.isCapturing) {
-            console.warn(`[${plateNumber}] A capture is already in progress. Skipping this request.`);
-            return null;
+        const fileListContent = relevantSegments.map(f => `file '${path.join(bufferPath, f)}'`).join('\n');
+        const listFilePath = path.join(bufferPath, 'templist.txt');
+        await writeFile(listFilePath, fileListContent);
+
+        console.log(`📋 Generated segment list for stitching.`);
+
+        const eventTimestamp = eventTime.getTime();
+        const startTimeMillis = eventTimestamp - (PRE_EVENT_SECONDS * 1000);
+
+        const firstSegmentName = relevantSegments[0];
+        const segmentTimestampStr = firstSegmentName.replace('segment_', '').replace('.mp4', '');
+        const firstSegmentTime = parseInt(segmentTimestampStr, 10);
+
+        const seekTime = (startTimeMillis - firstSegmentTime) / 1000;
+
+        if (seekTime < 0) {
+            console.warn('⚠️ Warning: Event occurred too long ago, may not have full pre-roll buffer.');
         }
+        const finalSeekTime = Math.max(0, seekTime);
 
-        this.isCapturing = true;
-        console.log(`[${plateNumber}] Starting on-demand video capture for ${VIDEO_CAPTURE_DURATION} seconds...`);
-
-        try {
-            await fs.mkdir(VIDEO_CAPTURE_PATH, { recursive: true });
-
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const finalFilename = `${plateNumber}_${timestamp}.mp4`;
-            const finalOutputPath = path.join(VIDEO_CAPTURE_PATH, finalFilename);
-
-            // This FFmpeg command connects, records, and then exits.
-            const args = [
-                '-rtsp_transport', 'tcp',
-                '-i', RTSP_URL,
-                '-t', VIDEO_CAPTURE_DURATION, // Record for this many seconds
-                '-c:v', 'libx264',
-                '-preset', 'ultrafast',
-                '-pix_fmt', 'yuv420p',
-                '-an',
-                '-y',
+        return new Promise<string>((resolve, reject) => {
+            const ffmpegArgs = [
+                '-f', 'concat',
+                '-safe', '0',
+                '-i', listFilePath,
+                '-ss', finalSeekTime.toString(),
+                '-t', captureDuration.toString(),
+                '-c', 'copy',
                 finalOutputPath
             ];
 
-            await new Promise<void>((resolve, reject) => {
-                const ffmpegProcess = spawn('ffmpeg', args);
+            console.log(`🏃 Running FFmpeg stitch command: ffmpeg ${ffmpegArgs.join(' ')}`);
 
-                ffmpegProcess.stderr?.on('data', (data) => {
-                    // For debugging ffmpeg issues: console.log(`[ffmpeg]: ${data.toString()}`);
-                });
+            const ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
 
-                ffmpegProcess.on('exit', (code) => {
-                    if (code === 0) {
-                        console.log(`✅ Successfully captured clip: ${finalFilename}`);
-                        resolve();
-                    } else {
-                        console.error(`FFmpeg capture process exited with code ${code}.`);
-                        reject(new Error(`FFmpeg exited with code ${code}`));
-                    }
-                });
+            ffmpegProcess.stderr.on('data', (data) => {});
 
-                ffmpegProcess.on('error', (err) => {
-                    console.error('Failed to start FFmpeg process:', err);
-                    reject(err);
-                });
+            ffmpegProcess.on('close', async (code) => {
+                await unlink(listFilePath).catch(err => console.error("Could not delete templist.txt", err));
+
+                if (code === 0) {
+                    console.log(`✅ Successfully created final clip: ${finalFilename}`);
+                    resolve(finalFilename);
+                } else {
+                    console.error(`🔴 FFmpeg stitch process exited with code ${code}`);
+                    reject(new Error(`FFmpeg exited with code ${code}`));
+                }
             });
+        });
 
-            return finalFilename; // Return just the filename
-
-        } catch (error) {
-            console.error("❌ Error during on-demand video capture:", error);
-            return null;
-        } finally {
-            this.isCapturing = false;
-        }
+    } catch (error) {
+        console.error(`🔴 Fatal error during video capture process for ${plate}:`, error);
+        throw error;
     }
 }
-
-export const videoCapture = new VideoCapture();
