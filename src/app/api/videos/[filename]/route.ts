@@ -7,15 +7,15 @@ import path from 'path';
 
 const statAsync = promisify(stat);
 
-function streamFile(fullPath: string, fileStat: any): NextResponse {
+// Helper function to stream a file with a given content type
+function streamFile(fullPath: string, fileStat: any, contentType: string): NextResponse {
     const stream = createReadStream(fullPath);
     return new NextResponse(stream as any, {
         status: 200,
         headers: {
-            'Content-Type': 'video/mp4',
+            'Content-Type': contentType,
             'Content-Length': fileStat.size.toString(),
             'Content-Disposition': `inline; filename="${path.basename(fullPath)}"`,
-            'Accept-Ranges': 'bytes',
         },
     });
 }
@@ -27,34 +27,34 @@ export async function GET(
     const videoCapturePath = process.env.VIDEO_FINAL_CAPTURE_PATH;
 
     if (!videoCapturePath) {
-        console.error('FATAL: VIDEO_FINAL_CAPTURE_PATH environment variable is not set in the Next.js process!');
-        return new NextResponse(JSON.stringify({ error: 'Video capture path is not configured on the server.' }), { status: 500 });
+        console.error('FATAL: VIDEO_FINAL_CAPTURE_PATH not set in Next.js process!');
+        return new NextResponse(JSON.stringify({ error: 'Video capture path not configured.' }), { status: 500 });
     }
 
     const filename = params.filename;
     const sanitizedFilename = path.basename(filename);
+
     if (sanitizedFilename !== filename) {
         return new NextResponse(JSON.stringify({ error: 'Invalid filename' }), { status: 400 });
     }
 
+    const isThumbnailRequest = sanitizedFilename.endsWith('.jpg');
+    const contentType = isThumbnailRequest ? 'image/jpeg' : 'video/mp4';
     const fullPath = path.join(videoCapturePath, sanitizedFilename);
 
     try {
         const fileStat = await statAsync(fullPath);
 
         if (fileStat.isFile()) {
-            return streamFile(fullPath, fileStat);
+            return streamFile(fullPath, fileStat, contentType);
         } else {
-            return new NextResponse(JSON.stringify({ error: 'Requested resource is not a file.' }), { status: 404 });
+            return new NextResponse(JSON.stringify({ error: 'Not a file.' }), { status: 404 });
         }
     } catch (error: any) {
         if (error.code === 'ENOENT') {
-            return new NextResponse(JSON.stringify({ error: 'Video file not found.' }), { status: 404 });
-        } else if (error.code === 'EACCES') {
-            console.error(`Permission denied error when trying to access: ${fullPath}`);
-            return new NextResponse(JSON.stringify({ error: 'Permission denied to access video file.' }), { status: 500 });
+            return new NextResponse(JSON.stringify({ error: 'File not found.' }), { status: 404 });
         }
-        console.error('An unhandled error occurred in the video API route:', error);
-        return new NextResponse(JSON.stringify({ error: 'An internal server error occurred.' }), { status: 500 });
+        console.error('Error in video API route:', error);
+        return new NextResponse(JSON.stringify({ error: 'Internal server error.' }), { status: 500 });
     }
 }

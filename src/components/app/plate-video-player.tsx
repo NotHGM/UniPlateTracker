@@ -1,9 +1,10 @@
 // src/components/app/plate-video-player.tsx
 "use client"
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { PlayCircle, Video } from "lucide-react";
+import { PlayCircle } from "lucide-react";
+import Image from "next/image";
 import styles from "./plates.module.css";
 
 interface PlateVideoPlayerProps {
@@ -13,49 +14,21 @@ interface PlateVideoPlayerProps {
 }
 
 export function PlateVideoPlayer({ videoUrl, plateNumber, appRegion }: PlateVideoPlayerProps) {
-    const [thumbnailSrc, setThumbnailSrc] = useState<string | null>(null);
     const [isOpen, setIsOpen] = useState(false);
-
-    useEffect(() => {
-        let isMounted = true;
-        const fetchThumbnail = async () => {
-            try {
-                const response = await fetch(`/api/videos/${videoUrl}?thumbnail=true`);
-                if (!response.ok) throw new Error("Thumbnail fetch failed");
-
-                const blob = await response.blob();
-                if (isMounted) {
-                    setThumbnailSrc(URL.createObjectURL(blob));
-                }
-            } catch (error) {
-                console.error("Could not fetch video thumbnail:", error);
-                if (isMounted) {
-                    setThumbnailSrc(null);
-                }
-            }
-        };
-
-        fetchThumbnail();
-
-        return () => {
-            isMounted = false;
-            if (thumbnailSrc) {
-                URL.revokeObjectURL(thumbnailSrc);
-            }
-        };
-    }, [videoUrl]);
+    const videoSrc = `/api/videos/${videoUrl}`;
+    const thumbnailSrc = `/api/videos/${videoUrl}.jpg`;
 
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
                 <div className="w-28 aspect-video rounded-md overflow-hidden bg-muted relative group cursor-pointer">
-                    {thumbnailSrc ? (
-                        <img src={thumbnailSrc} alt={`Thumbnail for ${plateNumber}`} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
-                    ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                            <Video className="w-6 h-6 text-muted-foreground animate-pulse" />
-                        </div>
-                    )}
+                    <Image
+                        src={thumbnailSrc}
+                        alt={`Thumbnail for ${plateNumber}`}
+                        fill
+                        sizes="112px" // w-28 is 112px
+                        className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                    />
                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                         <PlayCircle className="w-8 h-8 text-white/90" />
                     </div>
@@ -72,11 +45,14 @@ export function PlateVideoPlayer({ videoUrl, plateNumber, appRegion }: PlateVide
                 {isOpen && (
                     <div className="aspect-video w-full bg-black">
                         <video
-                            src={`/api/videos/${videoUrl}`}
+                            key={videoUrl}
+                            src={videoSrc}
                             controls
                             autoPlay
                             className="w-full h-full rounded-b-lg"
-                        />
+                        >
+                            Your browser does not support the video tag.
+                        </video>
                     </div>
                 )}
             </DialogContent>
