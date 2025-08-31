@@ -2,18 +2,18 @@
 
 **UniPlateTracker** is a secure, private, and self-hosted dashboard for tracking license plates captured by your UniFi Protect camera system. It gives you a clean web interface to view, search, and analyze vehicle activity on your property.
 
-Events are received in real-time from your UniFi NVR via webhooks. The application can enrich license plates with official data (for UK users via the DVLA) and can automatically capture a 10-second video clip of each detection. All data, including thumbnails and video paths, is stored in your private PostgreSQL database.
+Events are received in real-time from your UniFi NVR via webhooks. The application can enrich license plates with official data (for UK users via the DVLA) and can automatically capture a short, time-accurate video clip of each detection. All data, including thumbnails and video files, is stored on your private server and managed by your own PostgreSQL database.
 
 ## ✨ Key Features
 
--   **Real-Time Event Processing:** Instantly receives and processes license plate detections from UniFi Protect.
--   **Optional Video Capture:** Automatically records a 10-second video clip (pre- and post-event) for each detection using the camera's RTSP stream.
+-   **Real-Time Event Processing:** Instantly receives and processes license plate detections via UniFi Protect webhooks.
+-   **On-Demand Video Capture:** Automatically records a short video clip (with pre- and post-event buffering) for each detection using the camera's RTSP stream.
 -   **Optional DVLA Integration:** For UK users, automatically fetches vehicle details like make, color, tax, and MOT status.
 -   **International Mode:** Can be configured to work in any region by disabling UK-specific features.
--   **Private Data Storage:** Thumbnails and video file paths are stored directly in your database.
--   **Modern Web Dashboard:** A fast and responsive interface with dynamic filters, search, and automatic live updates.
--   **Admin Analytics:** A separate, protected admin dashboard with charts and statistics to visualize trends.
--   **Secure Authentication:** A complete admin login and sign-up system, with access controlled by an approved email list.
+-   **Secure Admin Dashboard:** A protected admin area with charts, usage statistics, and user management.
+-   **Hierarchical Admin Accounts:** The initial admin can securely add or revoke access for other administrators.
+-   **Full Audit Trail:** All administrative actions (adding/revoking users) are logged for the initial admin to review.
+-   **Modern Web Interface:** A fast and responsive dashboard with dynamic filters, search, and automatic live updates.
 -   **Light & Dark Mode:** Adapts to your system preferences for comfortable viewing.
 
 ## 🛠️ Tech Stack
@@ -21,7 +21,7 @@ Events are received in real-time from your UniFi NVR via webhooks. The applicati
 -   **Framework:** Next.js (App Router)
 -   **Language:** TypeScript
 -   **Video Processing:** FFmpeg
--   **Backend:** Next.js API Routes & a standalone Express.js Worker
+-   **Backend:** Next.js API Routes & a standalone Node.js Worker/Buffer Manager
 -   **Database:** PostgreSQL
 -   **UI:** React, Tailwind CSS, shadcn/ui
 -   **API Integration:** UniFi Protect Webhooks, DVLA API
@@ -42,7 +42,6 @@ Follow these instructions to build and run UniPlateTracker in a production envir
 -   **(Optional for UK users)** An API Key from the [DVLA Vehicle Enquiry Service](https://developer.vehicle-operator-licensing.service.gov.uk/).
 
 ### Step 1: Clone the Repository
-
 ```bash
 git clone https://github.com/NotHGM/UniPlateTracker.git
 cd UniPlateTracker
@@ -54,14 +53,15 @@ Create your configuration file by copying the example.
 ```bash
 cp .env.example .env.local
 ```
+
 Open `.env.local` with a text editor and fill in your details. **This is a production setup, so use your server's actual IP address or domain name for `NEXTAUTH_URL`.**
 
-### Step 3: Create Video Capture Directory
+### Step 3: Create Video Directories
 
-If you enable video capture, you must create the directory where the clips will be stored and ensure the application has permission to write to it. For example, if `VIDEO_CAPTURE_PATH` is `/opt/captures`:
+If you enable video capture (`ENABLE_VIDEO_CAPTURE="true"`), you must create the directories for the final clips and the temporary buffer. Ensure the application has permission to write to them. For example, if your paths are `/opt/captures` and `/opt/captures/buffer`:
 ```bash
-sudo mkdir -p /opt/captures
-sudo chown your_user:your_group /opt/captures
+sudo mkdir -p /opt/captures/buffer
+sudo chown your_user:your_group /opt/captures -R
 ```
 *(Replace `your_user:your_group` with the user that will run the application).*
 
@@ -82,7 +82,6 @@ Run this interactive script to create all necessary tables and add the first app
 ```bash
 npm run db:init
 ```
-
 ### Step 6: Configure the UniFi Protect Webhook
 
 Tell your UniFi NVR where to send detection events.
