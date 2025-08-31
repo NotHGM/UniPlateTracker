@@ -1,15 +1,12 @@
 // src/middleware.ts
+
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getIronSession } from 'iron-session';
-
-const sessionOptions = {
-    cookieName: 'admin_session',
-    password: process.env.SESSION_SECRET as string,
-};
+import { sessionOptions, SessionData } from '@/lib/session';
 
 export async function middleware(request: NextRequest) {
-    const session = await getIronSession<{ user?: { email: string } }>(
+    const session = await getIronSession<SessionData>(
         request.cookies,
         sessionOptions
     );
@@ -17,20 +14,17 @@ export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
     const isLoggedIn = !!session.user;
 
-    if (pathname.startsWith('/admin/auth')) {
-        if (isLoggedIn) {
-            return NextResponse.redirect(new URL('/admin', request.url));
-        }
-        return NextResponse.next();
+    if (!isLoggedIn && pathname.startsWith('/admin') && pathname !== '/admin/auth') {
+        return NextResponse.redirect(new URL('/admin/auth', request.url));
     }
 
-    if (!isLoggedIn) {
-        return NextResponse.redirect(new URL('/admin/auth', request.url));
+    if (isLoggedIn && pathname === '/admin/auth') {
+        return NextResponse.redirect(new URL('/admin', request.url));
     }
 
     return NextResponse.next();
 }
 
 export const config = {
-    matcher: ['/admin/:path*'],
+    matcher: ['/admin/:path*', '/admin'],
 };

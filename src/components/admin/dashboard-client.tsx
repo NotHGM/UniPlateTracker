@@ -5,7 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatCard } from "./stat-card";
 import { AdminManagement } from "./admin-management";
+import { AdminActivityLog } from "./admin-activity-log";
 import { Bar, BarChart, ResponsiveContainer, XAxis, Tooltip, CartesianGrid } from 'recharts';
+import useSWR from 'swr';
 
 interface HourlyData {
     name: string;
@@ -17,7 +19,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         const count = payload[0].value;
         const detectionText = count === 1 ? 'detection' : 'detections';
         return (
-            <div className="p-2 text-sm bg-background/90 backdrop-blur-sm border rounded-lg shadow-lg">
+            <div className="p-2 text-sm bg-background/ ৯০ backdrop-blur-sm border rounded-lg shadow-lg">
                 <p className="font-bold">{`${count} ${detectionText}`}</p>
                 <p className="text-muted-foreground">{`Hour: ${label}:00`}</p>
             </div>
@@ -65,7 +67,13 @@ const DetectionsChart = ({ data }: { data: HourlyData[] }) => {
     );
 };
 
+
 export function DashboardClient({ stats, currentUserEmail }: { stats: any, currentUserEmail: string }) {
+
+    const { data } = useSWR('/api/admin/management', (url) => fetch(url).then(res => res.json()));
+
+    const admins = data?.admins;
+    const amIInitialAdmin = admins?.find((admin: any) => admin.email === currentUserEmail)?.added_by_email === null;
 
     if (!stats) {
         return (
@@ -101,7 +109,7 @@ export function DashboardClient({ stats, currentUserEmail }: { stats: any, curre
         }
 
         return Array.from(hourlyMap.entries())
-            .map(([hour, count]) => ({ name: hour, count: count })) // Convert 'hour' to 'name' for the chart
+            .map(([hour, count]) => ({ name: hour, count: count }))
             .sort((a, b) => a.name.localeCompare(b.name));
     };
 
@@ -120,6 +128,10 @@ export function DashboardClient({ stats, currentUserEmail }: { stats: any, curre
             <DetectionsChart data={processedChartData} />
 
             <AdminManagement currentUserEmail={currentUserEmail} />
+
+            {amIInitialAdmin && (
+                <AdminActivityLog />
+            )}
         </div>
     )
 }

@@ -1,11 +1,10 @@
 // src/lib/session.ts
 
-import { IronSession, getIronSession } from 'iron-session';
-import { cookies } from 'next/headers';
+import { IronSessionOptions } from 'iron-session';
 
-export const sessionOptions = {
-    password: process.env.SESSION_SECRET as string,
+export const sessionOptions: IronSessionOptions = {
     cookieName: 'uniplate-session',
+    password: process.env.SESSION_SECRET as string,
     cookieOptions: {
         secure: process.env.NODE_ENV === 'production',
         httpOnly: true,
@@ -17,9 +16,4 @@ export interface SessionData {
         id: number;
         email: string;
     };
-}
-
-export async function getSession(): Promise<IronSession<SessionData>> {
-    const session = await getIronSession<SessionData>(cookies(), sessionOptions);
-    return session;
 }
