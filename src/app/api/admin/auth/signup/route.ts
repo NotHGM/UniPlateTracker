@@ -26,12 +26,10 @@ export async function POST(req: NextRequest) {
         const passwordHash = await bcrypt.hash(password, 12);
         const newUserRes = await client.query('INSERT INTO admin_users (email, password_hash) VALUES ($1, $2) RETURNING id, email', [lowerCaseEmail, passwordHash]);
         const newUser = newUserRes.rows[0];
-
         // @ts-ignore
         const session = await getIronSession<SessionData>(cookies(), sessionOptions);
         session.user = { id: newUser.id, email: newUser.email };
         await session.save();
-
         await client.query('COMMIT');
         return new NextResponse(JSON.stringify({ success: true, message: 'Signup successful!' }), { status: 201 });
     } catch (error) {

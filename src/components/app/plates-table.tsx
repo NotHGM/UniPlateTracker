@@ -1,7 +1,8 @@
-// src/components/app/plates-table.tsx
+// src/components/app/plates-table.tsx (FINAL, CORRECTED VERSION)
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+// FIX 1: Import React to provide the correct types like React.ReactNode
+import React, { useState, useEffect, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { PlatesApiResponse } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -31,11 +32,16 @@ interface PlatesTableProps {
     videoCaptureEnabled: boolean;
 }
 
-const formatPlate = (plate: string | null): JSX.Element => {
+// FIX 2: Change the return type to React.ReactNode to fix the "JSX" build error
+const formatPlate = (plate: string | null): React.ReactNode => {
     if (!plate) return <>{'N/A'}</>;
     plate = plate.replace(/\s/g, '');
-    if (plate.length >= 7) { return <><span>{plate.substring(0, 4)}</span><span>{plate.substring(4)}</span></>; }
-    if (plate.length === 6) { return <><span>{plate.substring(0, 3)}</span><span>{plate.substring(3)}</span></>; }
+    if (plate.length >= 7) {
+        return <><span>{plate.substring(0, 4)}</span><span>{plate.substring(4)}</span></>;
+    }
+    if (plate.length === 6) {
+        return <><span>{plate.substring(0, 3)}</span><span>{plate.substring(3)}</span></>;
+    }
     return <span>{plate}</span>;
 };
 
@@ -78,14 +84,17 @@ export function PlatesTable({ initialApiData, error, appRegion, internationalApi
         if (!updateData?.lastUpdate || !lastCheckedTimestamp) return;
         const isNewDataAvailable = new Date(updateData.lastUpdate) > new Date(lastCheckedTimestamp);
         if (isNewDataAvailable) {
-            const hasActiveFilters = Array.from(searchParams.keys()).some(k => k !== 'page' && searchParams.get(k));
-            const isOnAnotherPage = searchParams.has('page') && searchParams.get('page') !== '1';
+            // FIX 3: Rewrote this logic to avoid the "downlevelIteration" build error
+            let hasActiveFilters = false;
+            searchParams.forEach((value, key) => {
+                if (key !== 'page') {
+                    hasActiveFilters = true;
+                }
+            });
 
-            if (isOnAnotherPage || hasActiveFilters) {
-                setShowUpdateNotice(true);
-            } else {
-                router.refresh();
-            }
+            const isOnAnotherPage = searchParams.has('page') && searchParams.get('page') !== '1';
+            if (!isOnAnotherPage && !hasActiveFilters) { router.refresh(); }
+            else { setShowUpdateNotice(true); }
         }
     }, [updateData, lastCheckedTimestamp, router, searchParams]);
 
@@ -98,7 +107,7 @@ export function PlatesTable({ initialApiData, error, appRegion, internationalApi
             router.push(`${pathname}?${current.toString()}`, { scroll: false });
         }, 500);
         return () => clearTimeout(timer);
-    }, [filters.search]);
+    }, [filters.search, pathname, router, searchParams]);
 
     const handleApplyFilters = () => {
         const current = new URLSearchParams(searchParams.toString());
@@ -184,6 +193,7 @@ export function PlatesTable({ initialApiData, error, appRegion, internationalApi
                                         <TableCell className="pl-6 py-2">
                                             <div className="w-28 aspect-video rounded-md overflow-hidden bg-muted">
                                                 {plate.image_url ? (
+                                                    // FIX 4: Use the plate.image_url directly, without adding the base64 prefix
                                                     // eslint-disable-next-line @next/next/no-img-element
                                                     <img
                                                         src={plate.image_url}

@@ -9,14 +9,13 @@ export async function GET() {
     // @ts-ignore
     const session = await getIronSession<SessionData>(cookies(), sessionOptions);
     const currentUser = session.user;
-
     if (!currentUser) {
         return new NextResponse(JSON.stringify({ error: 'Forbidden' }), { status: 403 });
     }
     try {
         const userCheckRes = await pool.query('SELECT added_by FROM approved_emails WHERE email = $1', [currentUser.email]);
         if (userCheckRes.rows.length === 0 || userCheckRes.rows[0].added_by !== null) {
-            return new NextResponse(JSON.stringify({ error: 'Access Denied.' }), { status: 403 });
+            return new NextResponse(JSON.stringify({ error: 'Access Denied: Log is for initial admin only.' }), { status: 403 });
         }
         const query = `
             SELECT log.id, log.timestamp, log.action_type, log.target_email, actor.email AS actor_email
