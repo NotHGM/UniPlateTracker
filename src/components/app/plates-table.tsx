@@ -3,7 +3,6 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import Image from "next/image";
 import { PlatesApiResponse } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -35,12 +34,8 @@ interface PlatesTableProps {
 const formatPlate = (plate: string | null): JSX.Element => {
     if (!plate) return <>{'N/A'}</>;
     plate = plate.replace(/\s/g, '');
-    if (plate.length >= 7) {
-        return <><span>{plate.substring(0, 4)}</span><span>{plate.substring(4)}</span></>;
-    }
-    if (plate.length === 6) {
-        return <><span>{plate.substring(0, 3)}</span><span>{plate.substring(3)}</span></>;
-    }
+    if (plate.length >= 7) { return <><span>{plate.substring(0, 4)}</span><span>{plate.substring(4)}</span></>; }
+    if (plate.length === 6) { return <><span>{plate.substring(0, 3)}</span><span>{plate.substring(3)}</span></>; }
     return <span>{plate}</span>;
 };
 
@@ -83,10 +78,14 @@ export function PlatesTable({ initialApiData, error, appRegion, internationalApi
         if (!updateData?.lastUpdate || !lastCheckedTimestamp) return;
         const isNewDataAvailable = new Date(updateData.lastUpdate) > new Date(lastCheckedTimestamp);
         if (isNewDataAvailable) {
-            const hasActiveFilters = [...searchParams.keys()].some(k => k !== 'page');
+            const hasActiveFilters = Array.from(searchParams.keys()).some(k => k !== 'page' && searchParams.get(k));
             const isOnAnotherPage = searchParams.has('page') && searchParams.get('page') !== '1';
-            if (!isOnAnotherPage && !hasActiveFilters) { router.refresh(); }
-            else { setShowUpdateNotice(true); }
+
+            if (isOnAnotherPage || hasActiveFilters) {
+                setShowUpdateNotice(true);
+            } else {
+                router.refresh();
+            }
         }
     }, [updateData, lastCheckedTimestamp, router, searchParams]);
 
@@ -99,7 +98,7 @@ export function PlatesTable({ initialApiData, error, appRegion, internationalApi
             router.push(`${pathname}?${current.toString()}`, { scroll: false });
         }, 500);
         return () => clearTimeout(timer);
-    }, [filters.search, pathname, router, searchParams]);
+    }, [filters.search]);
 
     const handleApplyFilters = () => {
         const current = new URLSearchParams(searchParams.toString());
