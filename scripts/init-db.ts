@@ -53,7 +53,7 @@ async function initializeDatabase() {
         await client.query(`
             INSERT INTO app_state (id, last_plate_update)
             VALUES (1, NOW())
-            ON CONFLICT (id) DO NOTHING;
+                ON CONFLICT (id) DO NOTHING;
         `);
         console.log('✅ Table "app_state" for live updates is ready.');
 
@@ -71,12 +71,11 @@ async function initializeDatabase() {
 
         await client.query(`
             CREATE TABLE IF NOT EXISTS approved_emails (
-                id SERIAL PRIMARY KEY,
-                email VARCHAR(255) UNIQUE NOT NULL,
-                -- Tracks who added this email, referencing the admin_users table.
+                                                           id SERIAL PRIMARY KEY,
+                                                           email VARCHAR(255) UNIQUE NOT NULL,
                 added_by INTEGER REFERENCES admin_users(id) ON DELETE SET NULL,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            );
+                );
         `);
         console.log('✅ Table "approved_emails" is ready with hierarchy support.');
 
@@ -112,7 +111,8 @@ async function initializeDatabase() {
 
             if (emailResponse.email) {
                 const existing = await client.query('SELECT 1 FROM approved_emails WHERE email = $1', [emailResponse.email]);
-                if (existing.rowCount > 0) {
+
+                if (existing.rowCount && existing.rowCount > 0) {
                     console.log(`\n📧 Email "${emailResponse.email}" is already in the approved list. No action taken.`);
                 } else {
                     await client.query('INSERT INTO approved_emails (email) VALUES ($1)', [emailResponse.email]);

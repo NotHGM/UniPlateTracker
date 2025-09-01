@@ -15,13 +15,22 @@ interface AdminActivityLog {
     actor_email: string;
 }
 
+class FetchError extends Error {
+    info: unknown;
+    status: number;
+    constructor(message: string, info: unknown, status: number) {
+        super(message);
+        this.name = 'FetchError';
+        this.info = info;
+        this.status = status;
+    }
+}
+
 const fetcher = async (url: string) => {
     const res = await fetch(url);
     if (!res.ok) {
-        const error = new Error('An error occurred while fetching the data.');
-        (error as any).info = await res.json();
-        (error as any).status = res.status;
-        throw error;
+        const errorInfo = await res.json();
+        throw new FetchError('An error occurred while fetching the data.', errorInfo, res.status);
     }
     return res.json();
 };
@@ -31,7 +40,7 @@ export function AdminActivityLog() {
         revalidateOnFocus: false,
     });
 
-    if (error && (error as any).status === 403) {
+    if (error instanceof FetchError && error.status === 403) {
         return null;
     }
 

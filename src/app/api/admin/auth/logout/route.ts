@@ -1,9 +1,12 @@
 // src/app/api/admin/auth/logout/route.ts
 import { NextResponse } from 'next/server';
-import { getSession } from '@/lib/session';
+import { getIronSession } from 'iron-session';
+import { cookies } from 'next/headers';
+import { sessionOptions, SessionData } from '@/lib/session';
 
 export async function POST() {
-    const session = await getSession();
+    // @ts-ignore
+    const session = await getIronSession<SessionData>(cookies(), sessionOptions);
     session.destroy();
     return NextResponse.json({ message: "Logout successful" });
 }

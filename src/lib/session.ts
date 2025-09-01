@@ -1,8 +1,7 @@
 // src/lib/session.ts
+import { SessionOptions } from 'iron-session';
 
-import { IronSessionOptions } from 'iron-session';
-
-export const sessionOptions: IronSessionOptions = {
+export const sessionOptions: SessionOptions = {
     cookieName: 'uniplate-session',
     password: process.env.SESSION_SECRET as string,
     cookieOptions: {

@@ -6,7 +6,7 @@ export interface LicensePlate {
     capture_time: string;
     recent_capture_time: string;
     image_url: string | null;
-    // --- ADD/UPDATE THESE FIELDS ---
+    video_url: string | null;
     car_make: string | null;
     car_color: string | null;
     fuel_type: string | null;
@@ -20,9 +20,16 @@ export interface LicensePlate {
 
 export interface PlatesApiResponse {
     data: LicensePlate[];
+    lastCheckedTimestamp?: string;
     pagination: {
         currentPage: number;
         totalPages: number;
-        totalRecords: number;
+        totalRows: number;
     };
+    filterOptions: {
+        makes: string[];
+        colors: string[];
+        years: number[];
+    };
+    error?: string;
 }

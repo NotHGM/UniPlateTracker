@@ -1,9 +1,8 @@
 // src/app/admin/page.tsx
-
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { cookies } from 'next/headers';
 import { getIronSession } from 'iron-session';
+import { cookies } from 'next/headers';
 import { sessionOptions, SessionData } from '@/lib/session';
 import { DashboardClient } from '@/components/admin/dashboard-client';
 import { ModeToggle } from '@/components/mode-toggle';
@@ -30,8 +29,8 @@ async function getStatsData() {
 }
 
 export default async function AdminDashboardPage() {
+    // @ts-ignore
     const session = await getIronSession<SessionData>(cookies(), sessionOptions);
-
     if (!session.user) {
         redirect("/admin/auth");
     }

@@ -7,19 +7,20 @@ import path from 'path';
 
 dotenv.config({ path: path.resolve(__dirname, '../../.env.local') });
 
-const rtspUrl = process.env.RTSP_URL;
-const bufferPath = process.env.VIDEO_BUFFER_PATH;
+const rtspUrl: string | undefined = process.env.RTSP_URL;
+const bufferPath: string | undefined = process.env.VIDEO_BUFFER_PATH;
+
 const segmentDuration = parseInt(process.env.VIDEO_SEGMENT_DURATION || '30', 10);
 const bufferRetentionMinutes = parseInt(process.env.VIDEO_BUFFER_RETENTION_MINUTES || '5', 10);
 const cleanupInterval = segmentDuration * 1000;
 
-if (!rtspUrl || !bufferPath) {
-    console.error('🔴 Error: RTSP_URL and VIDEO_BUFFER_PATH environment variables must be set.');
-    process.exit(1);
-}
-
 function createSegment(): Promise<void> {
     return new Promise((resolve, reject) => {
+        if (!rtspUrl || !bufferPath) {
+            console.error('🔴 Critical Error: Environment variables are not available in createSegment.');
+            return reject(new Error("RTSP_URL or VIDEO_BUFFER_PATH is not defined."));
+        }
+
         const timestamp = Date.now();
         const filename = `segment_${timestamp}.mp4`;
         const outputPath = path.join(bufferPath, filename);
@@ -43,8 +44,7 @@ function createSegment(): Promise<void> {
             resolve();
         }, (segmentDuration + 15) * 1000);
 
-        ffmpegProcess.stderr.on('data', (data) => {
-        });
+        ffmpegProcess.stderr.on('data', () => {});
 
         ffmpegProcess.on('close', (code) => {
             clearTimeout(killTimeout);
@@ -65,6 +65,10 @@ function createSegment(): Promise<void> {
 }
 
 async function cleanupOldSegments() {
+    if (!bufferPath) {
+        console.error('🔴 Critical Error: VIDEO_BUFFER_PATH is not available in cleanupOldSegments.');
+        return;
+    }
     try {
         const files = await readdir(bufferPath);
         const now = Date.now();
@@ -87,6 +91,11 @@ async function cleanupOldSegments() {
 }
 
 async function main() {
+    if (!rtspUrl || !bufferPath) {
+        console.error('🔴 FATAL: RTSP_URL and VIDEO_BUFFER_PATH environment variables must be set before starting.');
+        process.exit(1);
+    }
+
     console.log('--- 📹 UniPlateTracker Video Buffer Manager ---');
     console.log(`Buffer Path: ${bufferPath}`);
     console.log(`Segment Duration: ${segmentDuration}s`);

@@ -1,54 +1,21 @@
 // src/app/page.tsx
-import { PlatesApiResponse } from "@/lib/types";
-import { PlatesTable } from "@/components/app/plates-table";
+
+import { Suspense } from "react";
 import { ModeToggle } from "@/components/mode-toggle";
 import { AdminButton } from "@/components/admin-button";
-import pool from "@/lib/db";
+import { HomePageClient } from "@/components/app/home-page-client";
+import { Skeleton } from "@/components/ui/skeleton";
 
-interface HomePageProps {
-  searchParams: { [key: string]: string | string[] | undefined };
+function DashboardSkeleton() {
+  return (
+      <div className="space-y-4">
+        <Skeleton className="h-[140px] w-full" />
+        <Skeleton className="h-[600px] w-full" />
+      </div>
+  );
 }
 
-async function getPlatesData(searchParams: HomePageProps['searchParams']) {
-  const cleanParams: Record<string, string> = {};
-  for (const [key, value] of Object.entries(searchParams)) {
-    if (typeof value === 'string') {
-      cleanParams[key] = value;
-    }
-  }
-  const query = new URLSearchParams(cleanParams).toString();
-  const baseUrl = process.env.NEXTAUTH_URL;
-
-  if (!baseUrl) {
-    return { error: "Configuration error: NEXTAUTH_URL is not set." };
-  }
-
-  try {
-    const platesResponse = await fetch(`${baseUrl}/api/plates?${query}`, { cache: 'no-store' });
-    if (!platesResponse.ok) throw new Error(`API responded with ${platesResponse.status}`);
-
-    const client = await pool.connect();
-    let lastUpdate;
-    try {
-      const stateResult = await client.query('SELECT last_plate_update FROM app_state WHERE id = 1');
-      lastUpdate = stateResult.rows[0]?.last_plate_update || new Date(0).toISOString();
-    } finally {
-      client.release();
-    }
-
-    const platesData: PlatesApiResponse = await platesResponse.json();
-    platesData.lastCheckedTimestamp = lastUpdate;
-
-    return { data: platesData };
-  } catch (error) {
-    console.error("Failed to fetch plates:", error);
-    return { error: "Could not connect to the API service." };
-  }
-}
-
-export default async function HomePage({ searchParams }: HomePageProps) {
-  const { data, error } = await getPlatesData(searchParams);
-
+export default function HomePage() {
   const appRegion = process.env.APP_REGION || 'UK';
   const internationalApiEnabled = process.env.ENABLE_INTERNATIONAL_API === 'true';
   const videoCaptureEnabled = process.env.ENABLE_VIDEO_CAPTURE === 'true';
@@ -68,13 +35,13 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               <ModeToggle />
             </div>
           </div>
-          <PlatesTable
-              initialApiData={data}
-              error={error}
-              appRegion={appRegion as 'UK' | 'INTERNATIONAL'}
-              internationalApiEnabled={internationalApiEnabled}
-              videoCaptureEnabled={videoCaptureEnabled}
-          />
+          <Suspense fallback={<DashboardSkeleton />}>
+            <HomePageClient
+                appRegion={appRegion as 'UK' | 'INTERNATIONAL'}
+                internationalApiEnabled={internationalApiEnabled}
+                videoCaptureEnabled={videoCaptureEnabled}
+            />
+          </Suspense>
         </main>
       </div>
   );

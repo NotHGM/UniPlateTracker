@@ -3,9 +3,10 @@
 import dotenv from 'dotenv';
 import path from 'path';
 dotenv.config({ path: path.resolve(__dirname, '../../.env.local') });
-import express = require('express');
+
+import express from 'express';
 import { Pool } from 'pg';
-import axios from 'axios';
+import axios, { isAxiosError } from 'axios';
 import { captureVideo } from './video-capture';
 
 const {
@@ -50,8 +51,8 @@ async function getVehicleDetailsFromDVLA(plateNumber: string): Promise<VehicleDe
         const response = await axios.post<VehicleDetails>(apiUrl, data, { headers });
         console.log(`[${plateNumber}] DVLA Check SUCCESS: Vehicle found (${response.data.make}).`);
         return response.data;
-    } catch (error) {
-        if (axios.isAxiosError(error) && error.response) {
+    } catch (error: unknown) {
+        if (isAxiosError(error) && error.response) {
             console.warn(`[${plateNumber}] DVLA Check FAILED: Status ${error.response.status}. Plate likely invalid or not found.`);
         } else {
             console.error(`[${plateNumber}] DVLA API request failed with an unexpected error:`, error);
@@ -60,12 +61,8 @@ async function getVehicleDetailsFromDVLA(plateNumber: string): Promise<VehicleDe
     }
 }
 
-// Placeholder for a custom international API integration
 async function getInternationalVehicleDetails(plateNumber: string): Promise<VehicleDetails | null> {
     console.log(`[${plateNumber}] International API lookup placeholder. To implement your own, edit this function in the worker.`);
-    // TODO: Implement your country's vehicle API call here.
-    // The returned object must match the VehicleDetails interface.
-    // For now, it returns null.
     return null;
 }
 

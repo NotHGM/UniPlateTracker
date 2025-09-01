@@ -1,5 +1,5 @@
 // src/app/api/plates/route.ts
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import pool from '@/lib/db';
 import { z } from 'zod';
 
@@ -14,7 +14,7 @@ const QuerySchema = z.object({
     mot: z.string().optional(),
 });
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const validation = QuerySchema.safeParse(Object.fromEntries(searchParams));
 
@@ -28,10 +28,9 @@ export async function GET(request: Request) {
     const conditions: string[] = [];
     const queryParams: (string | number)[] = [];
 
-    const addCondition = (field: string, value: any, operator: string = "=") => {
+    const addCondition = (field: string, value: string | number | undefined, operator = "=") => {
         if (value !== undefined && value !== null && value !== '') {
-            const paramValue = operator === 'ILIKE' ? `%${value}%` : value;
-            queryParams.push(paramValue);
+            queryParams.push(operator === 'ILIKE' ? `%${value}%` : value);
             conditions.push(`${field} ${operator} $${queryParams.length}`);
         }
     };
@@ -48,7 +47,6 @@ export async function GET(request: Request) {
     addCondition('mot_status', mot);
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-
     const client = await pool.connect();
     try {
         const dataQuery = `SELECT * FROM license_plates ${whereClause} ORDER BY recent_capture_time DESC LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
@@ -57,30 +55,28 @@ export async function GET(request: Request) {
         const countQuery = `SELECT COUNT(*) FROM license_plates ${whereClause}`;
         const countResult = await client.query(countQuery, queryParams);
 
+        const stateResult = await client.query('SELECT last_plate_update FROM app_state WHERE id = 1');
+
         const makesQuery = "SELECT DISTINCT car_make FROM license_plates WHERE car_make IS NOT NULL ORDER BY car_make ASC";
         const colorsQuery = "SELECT DISTINCT car_color FROM license_plates WHERE car_color IS NOT NULL ORDER BY car_color ASC";
         const yearsQuery = "SELECT DISTINCT year_of_manufacture FROM license_plates WHERE year_of_manufacture IS NOT NULL ORDER BY year_of_manufacture DESC";
 
         const [makesResult, colorsResult, yearsResult] = await Promise.all([
-            client.query(makesQuery),
-            client.query(colorsQuery),
-            client.query(yearsQuery),
+            client.query(makesQuery), client.query(colorsQuery), client.query(yearsQuery),
         ]);
 
         const totalRows = parseInt(countResult.rows[0].count, 10);
-        const totalPages = Math.ceil(totalRows / limit);
-
         return NextResponse.json({
             data: dataResult.rows,
-            pagination: { currentPage: page, totalPages, totalRows },
+            lastCheckedTimestamp: stateResult.rows[0]?.last_plate_update || new Date(0).toISOString(),
+            pagination: { currentPage: page, totalPages: Math.ceil(totalRows / limit), totalRows },
             filterOptions: {
                 makes: makesResult.rows.map(row => row.car_make),
                 colors: colorsResult.rows.map(row => row.car_color),
                 years: yearsResult.rows.map(row => row.year_of_manufacture),
             }
         });
-
-    } catch (error) {
+    } catch (error: unknown) {
         console.error('API Error fetching plates:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     } finally {

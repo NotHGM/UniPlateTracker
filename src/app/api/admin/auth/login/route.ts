@@ -1,5 +1,4 @@
 // src/app/api/admin/auth/login/route.ts
-
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import bcrypt from 'bcrypt';
@@ -24,6 +23,7 @@ export async function POST(req: NextRequest) {
             return new NextResponse(JSON.stringify({ message: 'Invalid credentials.' }), { status: 401 });
         }
 
+        // @ts-ignore
         const session = await getIronSession<SessionData>(cookies(), sessionOptions);
         session.user = { id: user.id, email: user.email };
         await session.save();

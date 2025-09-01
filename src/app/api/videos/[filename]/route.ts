@@ -1,16 +1,15 @@
 // src/app/api/videos/[filename]/route.ts
-
 import { NextRequest, NextResponse } from 'next/server';
-import { stat, createReadStream } from 'fs';
-import { promisify } from 'util';
+import { createReadStream, Stats } from 'fs';
+import { stat } from 'fs/promises';
+import { Readable } from 'stream';
 import path from 'path';
 
-const statAsync = promisify(stat);
+function streamFile(fullPath: string, fileStat: Stats, contentType: string): NextResponse {
+    const nodeStream = createReadStream(fullPath);
+    const webStream = Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>;
 
-// Helper function to stream a file with a given content type
-function streamFile(fullPath: string, fileStat: any, contentType: string): NextResponse {
-    const stream = createReadStream(fullPath);
-    return new NextResponse(stream as any, {
+    return new NextResponse(webStream, {
         status: 200,
         headers: {
             'Content-Type': contentType,
@@ -20,10 +19,13 @@ function streamFile(fullPath: string, fileStat: any, contentType: string): NextR
     });
 }
 
-export async function GET(
-    req: NextRequest,
-    { params }: { params: { filename: string } }
-) {
+export async function GET(request: NextRequest) {
+    const filename = request.nextUrl.pathname.split('/').pop();
+
+    if (!filename) {
+        return new NextResponse(JSON.stringify({ error: 'Filename is missing in the URL.' }), { status: 400 });
+    }
+
     const videoCapturePath = process.env.VIDEO_FINAL_CAPTURE_PATH;
 
     if (!videoCapturePath) {
@@ -31,7 +33,6 @@ export async function GET(
         return new NextResponse(JSON.stringify({ error: 'Video capture path not configured.' }), { status: 500 });
     }
 
-    const filename = params.filename;
     const sanitizedFilename = path.basename(filename);
 
     if (sanitizedFilename !== filename) {
@@ -43,16 +44,17 @@ export async function GET(
     const fullPath = path.join(videoCapturePath, sanitizedFilename);
 
     try {
-        const fileStat = await statAsync(fullPath);
-
+        const fileStat = await stat(fullPath);
         if (fileStat.isFile()) {
             return streamFile(fullPath, fileStat, contentType);
         } else {
             return new NextResponse(JSON.stringify({ error: 'Not a file.' }), { status: 404 });
         }
-    } catch (error: any) {
-        if (error.code === 'ENOENT') {
-            return new NextResponse(JSON.stringify({ error: 'File not found.' }), { status: 404 });
+    } catch (error: unknown) {
+        if (typeof error === 'object' && error !== null && 'code' in error) {
+            if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+                return new NextResponse(JSON.stringify({ error: 'File not found.' }), { status: 404 });
+            }
         }
         console.error('Error in video API route:', error);
         return new NextResponse(JSON.stringify({ error: 'Internal server error.' }), { status: 500 });

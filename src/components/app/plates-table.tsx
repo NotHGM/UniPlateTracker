@@ -3,7 +3,8 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { LicensePlate, PlatesApiResponse } from "@/lib/types";
+import Image from "next/image";
+import { PlatesApiResponse } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
@@ -31,7 +32,7 @@ interface PlatesTableProps {
     videoCaptureEnabled: boolean;
 }
 
-const formatPlate = (plate: string | null): JSX.Element => {
+const formatPlate = (plate: string | null) => {
     if (!plate) return <>{'N/A'}</>;
     plate = plate.replace(/\s/g, '');
     if (plate.length >= 7) {
@@ -102,6 +103,7 @@ export function PlatesTable({ initialApiData, error, appRegion, internationalApi
 
     const handleApplyFilters = () => {
         const current = new URLSearchParams(searchParams.toString());
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { search, ...dropdownFilters } = filters;
         Object.entries(dropdownFilters).forEach(([key, value]) => {
             if (value && value !== 'all') {
@@ -162,11 +164,9 @@ export function PlatesTable({ initialApiData, error, appRegion, internationalApi
                     </div>
                 )}
             </div>
-
             <AnimatePresence>
                 {showUpdateNotice && ( <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="pb-4"> <Button className="w-full" onClick={handleShowNewPlates}><RefreshCw className="mr-2 h-4 w-4 animate-spin" />New Detections Available - Click to Show</Button> </motion.div> )}
             </AnimatePresence>
-
             <div className="rounded-lg border bg-card text-card-foreground">
                 <Table>
                     <TableHeader>
@@ -187,16 +187,11 @@ export function PlatesTable({ initialApiData, error, appRegion, internationalApi
                                 plates.map((plate) => (
                                     <motion.tr key={plate.id} layoutId={`plate-${plate.id}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3, ease: "easeOut" }}>
                                         <TableCell className="pl-6 py-2">
-                                            <div className="w-28 aspect-video rounded-md overflow-hidden bg-muted">
-                                                {plate.image_url ? (<img src={plate.image_url} alt={`Capture of ${plate.plate_number}`} className="w-full h-full object-cover"/>) : null}
+                                            <div className="w-28 aspect-video rounded-md overflow-hidden bg-muted relative">
+                                                {plate.image_url ? (<Image src={`data:image/jpeg;base64,${plate.image_url}`} alt={`Capture of ${plate.plate_number}`} className="w-full h-full object-cover" fill sizes="112px"/>) : null}
                                             </div>
                                         </TableCell>
-                                        <TableCell className="align-middle">
-                                            <div className={appRegion === 'UK' ? styles.ukPlateStyle : styles.intlPlateStyle}>
-                                                {formatPlate(plate.plate_number)}
-                                            </div>
-                                        </TableCell>
-
+                                        <TableCell className="align-middle"><div className={appRegion === 'UK' ? styles.ukPlateStyle : styles.intlPlateStyle}>{formatPlate(plate.plate_number)}</div></TableCell>
                                         {showVehicleDetails && (
                                             <>
                                                 <TableCell className="align-middle"><div className="font-semibold">{plate.car_make || 'N/A'}</div><div className="text-sm text-muted-foreground">{plate.car_color || 'N/A'} • {plate.fuel_type || 'N/A'}</div></TableCell>
@@ -205,19 +200,11 @@ export function PlatesTable({ initialApiData, error, appRegion, internationalApi
                                                 <TableCell className="align-middle"><div className="font-semibold">{plate.year_of_manufacture || 'N/A'}</div><div className="text-sm text-muted-foreground">{plate.month_of_first_registration ? `Reg: ${dayjs(plate.month_of_first_registration).format('MMM YYYY')}` : 'N/A'}</div></TableCell>
                                             </>
                                         )}
-
                                         {videoCaptureEnabled && (
                                             <TableCell className="align-middle">
-                                                {plate.video_url ? (
-                                                    <PlateVideoPlayer videoUrl={plate.video_url} plateNumber={plate.plate_number} appRegion={appRegion}/>
-                                                ) : (
-                                                    <div className="w-28 aspect-video bg-muted rounded-md flex items-center justify-center">
-                                                        <VideoOff className="w-5 h-5 text-muted-foreground" />
-                                                    </div>
-                                                )}
+                                                {plate.video_url ? (<PlateVideoPlayer videoUrl={plate.video_url} plateNumber={plate.plate_number} appRegion={appRegion}/>) : (<div className="w-28 aspect-video bg-muted rounded-md flex items-center justify-center"><VideoOff className="w-5 h-5 text-muted-foreground" /></div>)}
                                             </TableCell>
                                         )}
-
                                         <TableCell className="text-left align-middle pr-6">
                                             <div className="font-semibold">{dayjs(plate.recent_capture_time).fromNow()}</div>
                                             <div className="text-xs text-muted-foreground">{dayjs(plate.recent_capture_time).format('DD/MM/YY HH:mm')}</div>
@@ -229,7 +216,6 @@ export function PlatesTable({ initialApiData, error, appRegion, internationalApi
                     </TableBody>
                 </Table>
             </div>
-
             {pagination.totalPages > 1 && ( <div className="flex justify-end mt-4"> <DataPagination currentPage={pagination.currentPage} totalPages={pagination.totalPages} /> </div> )}
         </div>
     );
