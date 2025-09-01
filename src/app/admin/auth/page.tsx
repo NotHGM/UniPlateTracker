@@ -1,4 +1,4 @@
-// src/app/admin/auth/page.tsx
+// src/app/admin/page.tsx
 'use client';
 
 import { useState } from 'react';
@@ -27,22 +27,23 @@ export default function AuthPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password }),
             });
+
             const data = await response.json();
+
             if (!response.ok) {
-                throw new Error(data.message || 'An unknown error occurred.');
+                throw new Error(data.message || 'An unknown server error occurred.');
             }
+
             setMessage({ type: 'success', text: data.message });
+
+            // SIMPLIFIED REDIRECT: Just push to the new route.
             setTimeout(() => {
                 router.push('/admin');
-                router.refresh();
             }, 1000);
 
         } catch (error: unknown) {
-            if (error instanceof Error) {
-                setMessage({ type: 'error', text: error.message });
-            } else {
-                setMessage({ type: 'error', text: 'An unexpected error occurred.' });
-            }
+            const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred.';
+            setMessage({ type: 'error', text: errorMessage });
             setIsLoading(false);
         }
     };
@@ -54,6 +55,7 @@ export default function AuthPage() {
                     <TabsTrigger value="login">Login</TabsTrigger>
                     <TabsTrigger value="signup">Sign Up</TabsTrigger>
                 </TabsList>
+
                 <Card className="mt-4">
                     <CardHeader className="text-center">
                         <CardTitle className="text-2xl">UniPlateTracker Admin</CardTitle>
@@ -72,6 +74,7 @@ export default function AuthPage() {
                         <div className="space-y-2">
                             <Input id="password" type="password" placeholder="••••••••••" value={password} onChange={(e) => setPassword(e.target.value)} disabled={isLoading} />
                         </div>
+
                         <TabsContent value="login" className="space-y-0">
                             <Button onClick={() => handleAuth('login')} disabled={isLoading} className="w-full">
                                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Login
