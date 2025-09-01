@@ -32,7 +32,7 @@ interface PlatesTableProps {
     videoCaptureEnabled: boolean;
 }
 
-const formatPlate = (plate: string | null) => {
+const formatPlate = (plate: string | null): JSX.Element => {
     if (!plate) return <>{'N/A'}</>;
     plate = plate.replace(/\s/g, '');
     if (plate.length >= 7) {
@@ -106,11 +106,7 @@ export function PlatesTable({ initialApiData, error, appRegion, internationalApi
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { search, ...dropdownFilters } = filters;
         Object.entries(dropdownFilters).forEach(([key, value]) => {
-            if (value && value !== 'all') {
-                current.set(key, value);
-            } else {
-                current.delete(key);
-            }
+            if (value && value !== 'all') { current.set(key, value); } else { current.delete(key); }
         });
         current.set("page", "1");
         router.push(`${pathname}?${current.toString()}`, { scroll: false });
@@ -165,7 +161,7 @@ export function PlatesTable({ initialApiData, error, appRegion, internationalApi
                 )}
             </div>
             <AnimatePresence>
-                {showUpdateNotice && ( <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="pb-4"> <Button className="w-full" onClick={handleShowNewPlates}><RefreshCw className="mr-2 h-4 w-4 animate-spin" />New Detections Available - Click to Show</Button> </motion.div> )}
+                {showUpdateNotice && ( <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="pb-4"> <Button className="w-full" onClick={handleShowNewPlates}><RefreshCw className="mr-2 h-4 w-4 animate-spin" />New Detections Available</Button> </motion.div> )}
             </AnimatePresence>
             <div className="rounded-lg border bg-card text-card-foreground">
                 <Table>
@@ -187,11 +183,19 @@ export function PlatesTable({ initialApiData, error, appRegion, internationalApi
                                 plates.map((plate) => (
                                     <motion.tr key={plate.id} layoutId={`plate-${plate.id}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3, ease: "easeOut" }}>
                                         <TableCell className="pl-6 py-2">
-                                            <div className="w-28 aspect-video rounded-md overflow-hidden bg-muted relative">
-                                                {plate.image_url ? (<Image src={`data:image/jpeg;base64,${plate.image_url}`} alt={`Capture of ${plate.plate_number}`} className="w-full h-full object-cover" fill sizes="112px"/>) : null}
+                                            <div className="w-28 aspect-video rounded-md overflow-hidden bg-muted">
+                                                {plate.image_url ? (
+                                                    // eslint-disable-next-line @next/next/no-img-element
+                                                    <img
+                                                        src={plate.image_url}
+                                                        alt={`Capture of ${plate.plate_number}`}
+                                                        className="w-full h-full object-cover"
+                                                    />) : null}
                                             </div>
                                         </TableCell>
-                                        <TableCell className="align-middle"><div className={appRegion === 'UK' ? styles.ukPlateStyle : styles.intlPlateStyle}>{formatPlate(plate.plate_number)}</div></TableCell>
+                                        <TableCell className="align-middle">
+                                            <div className={appRegion === 'UK' ? styles.ukPlateStyle : styles.intlPlateStyle}>{formatPlate(plate.plate_number)}</div>
+                                        </TableCell>
                                         {showVehicleDetails && (
                                             <>
                                                 <TableCell className="align-middle"><div className="font-semibold">{plate.car_make || 'N/A'}</div><div className="text-sm text-muted-foreground">{plate.car_color || 'N/A'} • {plate.fuel_type || 'N/A'}</div></TableCell>
