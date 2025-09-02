@@ -1,0 +1,34 @@
+# =============================================================
+#         UniPlateTracker Docker Compose File
+# =============================================================
+#      To run UniPlateTracker using the official image
+# =============================================================
+version: '3.8'
+
+services:
+  uniplatetracker:
+    image: ghcr.io/nothgm/uniplatetracker:latest
+    container_name: uniplatetracker
+    restart: unless-stopped
+
+    ports:
+      # Next.js Application Port
+      - "3000:3000"
+      # Webhook Worker Port (must match WORKER_PORT in .env.local)
+      - "4000:4000"
+
+    # Loads all configuration from the .env.local file.
+    env_file:
+      - .env.local
+
+    # Mounts local volumes to ensure your video files are not lost.
+    volumes:
+      - uniplatetracker_videos:/opt/captures/final
+      - uniplatetracker_buffer:/opt/captures/buffer
+
+# Defines the named volumes that will persist on your server.
+volumes:
+  uniplatetracker_videos:
+    driver: local
+  uniplatetracker_buffer:
+    driver: local
