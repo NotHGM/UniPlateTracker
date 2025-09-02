@@ -28,108 +28,144 @@ Events are received in real-time from your UniFi NVR via webhooks. The applicati
 
 ---
 
-## 🚀 Deployment Guide
+## 🚀 Deployment
 
-Follow these instructions to build and run UniPlateTracker in a production environment.
+### Compatibility
+ℹ️ This project was developed and thoroughly tested on the following production environment. While it is expected to work with other configurations, this is the official baseline:
+*   **Operating System:** Debian 12
+*   **UniFi Protect Camera:** UVC-AI-Pro (Device Version: 5.1.57)
+*   **UniFi Protect Application:** Version 9.4.19
 
-### Prerequisites
+There are two primary methods for deploying UniPlateTracker. Choose the one that best fits your environment.
 
--   A server or computer to run the application (e.g., Docker, Linux VM, Raspberry Pi 5).
--   [Node.js](https://nodejs.org/) (v20.x or later).
--   [PostgreSQL](https://www.postgresql.org/) database.
--   [**FFmpeg**](https://ffmpeg.org/download.html) installed on the server. For Debian/Ubuntu: `sudo apt update && sudo apt install ffmpeg`.
--   A UniFi Protect NVR (UDM Pro, UNVR, etc.) with at least one LPR-capable camera.
--   **(Optional for UK users)** An API Key from the [DVLA Vehicle Enquiry Service](https://developer.vehicle-operator-licensing.service.gov.uk/).
+1.  **Manual Installation (with PM2):** Build the source code on your host machine. This gives you direct control over the files and process.
+2.  **Docker:** Run the pre-built application in an isolated container. This is often simpler as it packages all dependencies (like FFmpeg) for you.
 
-### Step 1: Clone the Repository
+---
+
+### Method 1: Manual Installation (from Source)
+
+Follow these instructions to build and run UniPlateTracker directly on a host machine.
+
+**Prerequisites:**
+*   A server or computer to run the application (e.g., Linux VM, Raspberry Pi 5).
+*   [Node.js](https://nodejs.org/) (v20.x or later).
+*   [PostgreSQL](https://www.postgresql.org/) database.
+*   [**FFmpeg**](https://ffmpeg.org/download.html) installed on the server. For Debian/Ubuntu: `sudo apt update && sudo apt install ffmpeg`.
+*   A UniFi Protect NVR (UDM Pro, UNVR, etc.) with at least one LPR-capable camera.
+
+**Step 1: Clone the Repository**
 ```bash
 git clone https://github.com/NotHGM/UniPlateTracker.git
 cd UniPlateTracker
 ```
 
-### Step 2: Configure Environment Variables
-
+**Step 2: Configure Environment Variables**
 Create your configuration file by copying the example.
 ```bash
 cp .env.example .env.local
 ```
+Open `.env.local` with a text editor and fill in your details, including your `POSTGRES_URL` and `SESSION_SECRET`.
 
-Open `.env.local` with a text editor and fill in your details. **This is a production setup, so use your server's actual IP address or domain name for `NEXTAUTH_URL`.**
-
-### Step 3: Create Video Directories
-
-If you enable video capture (`ENABLE_VIDEO_CAPTURE="true"`), you must create the directories for the final clips and the temporary buffer. Ensure the application has permission to write to them. For example, if your paths are `/opt/captures` and `/opt/captures/buffer`:
+**Step 3: Create Video Directories (If Enabled)**
+If you set `ENABLE_VIDEO_CAPTURE="true"`, you must create the directories specified in your `.env.local` file.
 ```bash
 sudo mkdir -p /opt/captures/buffer
 sudo chown your_user:your_group /opt/captures -R
 ```
-*(Replace `your_user:your_group` with the user that will run the application).*
+*(Replace paths and `your_user:your_group` to match your setup).*
 
-### Step 4: Install Dependencies
-
-Install the necessary packages for both the main app and the worker service.
+**Step 4: Install Dependencies**
 ```bash
-# Install root dependencies
 npm install
-
-# Install worker dependencies
 npm install --prefix worker
 ```
 
-### Step 5: Set Up the Database
-
+**Step 5: Set Up the Database**
 Run this interactive script to create all necessary tables and add the first approved admin email.
 ```bash
 npm run db:init
 ```
-### Step 6: Configure the UniFi Protect Webhook
 
-Tell your UniFi NVR where to send detection events.
-1.  In UniFi Protect, go to **Settings > System > Other Settings**.
-2.  Under **Alarm Manager**, click **Create Alarm**.
-3.  Configure the alarm:
-    *   **Name:** `UniPlateTracker`
-    *   **Trigger:** Go to **ID > LPR** and check **Unknown Vehicles** and **Known Vehicles**.
-    *   **Scope:** Select your LPR camera(s).
-    *   **Action:**
-        *   **Webhook Type:** `Custom Webhook`
-        *   **Delivery URL:** `http://[YOUR_SERVER_IP]:[WORKER_PORT]/webhook` (e.g., `http://192.168.1.50:4000/webhook`)
-        *   **Advanced Settings > Method:** `POST`
-        *   **Advanced Settings > Enable Use Thumbnails:** Toggle **ON**.
-4.  Click **Save**.
-
-### Step 7: Build the Application for Production
-
-This single command compiles both the Next.js frontend and the TypeScript worker into optimized JavaScript.
+**Step 6: Build and Run the Application**
+First, build the optimized production code:
 ```bash
 npm run build
 ```
-
-### Step 8: Run the Application
-
-This command starts both the Next.js web server and the background worker together.
+Then, start the application:
 ```bash
 npm start
 ```
-Your application is now running. Keep the terminal open.
+Your application is now running, but it will stop if you close the terminal. For a persistent setup, proceed to the next step.
 
-#### (Recommended) Running Persistently with PM2
-
-To keep the application running after you close your terminal, use a process manager like PM2.
+**Step 7: Run Persistently with PM2**
+PM2 is a process manager that will keep your app running in the background and restart it automatically.
 
 1.  **Install PM2 globally:**
     ```bash
     npm install pm2 -g
     ```
 
-2.  **Start your entire application with PM2:**
+2.  **Start the application using PM2:**
     ```bash
     pm2 start "npm start" --name "uniplatetracker"
     ```
 
-3.  **To ensure it restarts on server reboot, run:**
+3.  **Save the process list and create a startup script:**
     ```bash
     pm2 startup
     pm2 save
     ```
-You can monitor your app with `pm2 list` and view logs with `pm2 logs uniplatetrack`
+You can monitor your app with `pm2 list` and view logs with `pm2 logs uniplatetracker`.
+
+**Step 8: Configure the UniFi Protect Webhook**
+Finally, tell your UniFi NVR where to send detection events by creating a Custom Webhook alarm that points to `http://[YOUR_SERVER_IP]:[WORKER_PORT]/webhook`.
+
+---
+
+### Method 2: Docker
+
+This method uses the official pre-built Docker image. It's often faster as you don't need to install Node.js or FFmpeg on your host machine.
+
+**Prerequisites:**
+*   A server with Docker and Docker Compose installed.
+*   An existing PostgreSQL database and its connection URL.
+
+**Step 1: Create a Directory**
+Create a folder on your server to hold your configuration files.
+```bash
+mkdir ~/uniplatetracker && cd ~/uniplatetracker
+```
+
+**Step 2: Download Configuration Files**
+```bash
+wget -O docker-compose.yml https://raw.githubusercontent.com/NotHGM/UniPlateTracker/main/docker-compose.yml
+wget -O .env.example https://raw.githubusercontent.com/NotHGM/UniPlateTracker/main/.env.example
+```
+
+**Step 3: Configure Your Instance**
+Rename the example file and edit it with your settings.
+```bash
+mv .env.example .env.local
+nano .env.local
+```
+Fill in all your details, especially your `POSTGRES_URL`, `SESSION_SECRET`, and `NEXTAUTH_URL`.
+
+**Step 4: Initialize the Database**
+This one-time command connects to your database and sets up the required tables and your first admin user.
+```bash
+docker run --rm -it --env-file .env.local ghcr.io/nothgm/uniplatetracker:latest npm run db:init
+```
+
+**Step 5: Launch UniPlateTracker**
+This command will pull the image and start the application in the background.
+```bash
+docker compose up -d
+```
+
+**Step 6: Configure the UniFi Protect Webhook**
+Follow the same webhook setup instructions from Step 8 in the manual guide above to point UniFi Protect to `http://[YOUR_SERVER_IP]:[WORKER_PORT]/webhook`.
+
+Your UniPlateTracker instance is now running!
+*   **Web Interface:** `http://<your_server_ip>:3000`
+*   **Webhook Endpoint:** `http://<your_server_ip>:4000`
