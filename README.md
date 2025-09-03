@@ -125,7 +125,7 @@ Finally, tell your UniFi NVR where to send detection events by creating a Custom
 
 ### Method 2: Docker
 
-This method uses the official pre-built Docker image. It's often faster as you don't need to install Node.js or FFmpeg on your host machine.
+This method uses the official pre-built Docker image. It's the recommended and fastest way to get started, as you don't need to install Node.js or FFmpeg on your host machine.
 
 **Prerequisites:**
 *   A server with Docker and Docker Compose installed.
@@ -133,35 +133,54 @@ This method uses the official pre-built Docker image. It's often faster as you d
 
 **Step 1: Create a Directory**
 Create a folder on your server to hold your configuration files.
+
 ```bash
 mkdir ~/uniplatetracker && cd ~/uniplatetracker
 ```
 
+
 **Step 2: Download Configuration Files**
+Download the `docker-compose.yml` and the environment variable template from the repository. Ensure your `docker-compose.yml` is set to use the `:main` image tag.
+
 ```bash
 wget -O docker-compose.yml https://raw.githubusercontent.com/NotHGM/UniPlateTracker/main/docker-compose.yml
 wget -O .env.example https://raw.githubusercontent.com/NotHGM/UniPlateTracker/main/.env.example
 ```
 
+
 **Step 3: Configure Your Instance**
-Rename the example file and edit it with your settings.
+Rename the example file. The application will specifically load its configuration from `.env.local`.
+
 ```bash
 mv .env.example .env.local
+```
+
+Now, edit the file with your settings using a text editor like `nano`.
+
+```bash
 nano .env.local
 ```
-Fill in all your details, especially your `POSTGRES_URL`, `SESSION_SECRET`, and `NEXTAUTH_URL`.
+
+Fill in all your details, especially your `POSTGRES_URL`, `SESSION_SECRET`, and `NEXTAUTH_URL`. **Important:** For `POSTGRES_URL`, use your server's network IP address, not `localhost`.
 
 **Step 4: Initialize the Database**
-This one-time command connects to your database and sets up the required tables and your first admin user.
+This one-time command starts a temporary container and mounts your local configuration file into it. This connects to your database, sets up the required tables, and lets you create your first admin user.
+
+*Note: This command uses `-v` to mount the config file, as this is required for the script to read it.*
+
 ```bash
-docker run --rm -it --env-file .env.local ghcr.io/nothgm/uniplatetracker:latest npm run db:init
+docker run --rm -it -v $(pwd)/.env.local:/app/.env.local ghcr.io/nothgm/uniplatetracker:main npm run db:init
 ```
 
+Follow the interactive prompts to add your primary admin email address.
+
 **Step 5: Launch UniPlateTracker**
-This command will pull the image and start the application in the background.
-```bash
-docker compose up -d
+This command will pull the latest version of the `:main` application image and start it in the background.
+
+```bash 
+docker compose pull && docker compose up -d
 ```
+
 
 **Step 6: Configure the UniFi Protect Webhook**
 Follow the same webhook setup instructions from Step 8 in the manual guide above to point UniFi Protect to `http://[YOUR_SERVER_IP]:[WORKER_PORT]/webhook`.
@@ -169,3 +188,5 @@ Follow the same webhook setup instructions from Step 8 in the manual guide above
 Your UniPlateTracker instance is now running!
 *   **Web Interface:** `http://<your_server_ip>:3000`
 *   **Webhook Endpoint:** `http://<your_server_ip>:4000`
+*   **View Logs:** `docker compose logs -f`
+*   **Stop Application:** `docker compose down`
