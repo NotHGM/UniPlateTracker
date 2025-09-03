@@ -12,7 +12,7 @@ on:
 
 jobs:
   analyze:
-    name: Analyze Code
+    name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
     permissions:
       security-events: write
@@ -23,26 +23,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: ['actions', 'javascript-typescript']
+        include:
+          - language: 'actions'
+            build-mode: 'none'
+          - language: 'javascript-typescript'
+            build-mode: 'none'
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
-          build-mode: manual
-
-      - if: matrix.language == 'javascript-typescript'
-        name: Build UniPlateTracker
-        shell: bash
-        run: |
-          npm install
-          npm install --prefix worker
-          npm run build
-
+          build-mode: ${{ matrix.build-mode }}
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
         with:
