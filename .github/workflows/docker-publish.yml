@@ -36,4 +36,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
+            APP_REGION=${{ secrets.APP_REGION }}
+            ENABLE_INTERNATIONAL_API=${{ secrets.ENABLE_INTERNATIONAL_API }}
             NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL }}
+            ENABLE_VIDEO_CAPTURE=${{ secrets.ENABLE_VIDEO_CAPTURE }}
