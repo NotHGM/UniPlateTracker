@@ -7,7 +7,7 @@ version: '3.8'
 
 services:
   uniplatetracker:
-    image: ghcr.io/nothgm/uniplatetracker:latest
+    image: ghcr.io/nothgm/uniplatetracker:main
     container_name: uniplatetracker
     restart: unless-stopped
 
