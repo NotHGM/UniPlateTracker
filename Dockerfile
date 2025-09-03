@@ -15,6 +15,12 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+
+# Accept build arguments for environment variables
+ARG NEXTAUTH_URL
+# Set the environment variables for the build process
+ENV NEXTAUTH_URL=$NEXTAUTH_URL
+
 # This command should build both the Next.js app and the worker TypeScript code
 RUN npm run build
 
