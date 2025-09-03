@@ -49,17 +49,21 @@ RUN npm run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 
+# Install FFmpeg using the Alpine package manager so the video scripts can use it
+RUN apk add --no-cache ffmpeg
+
 # Set environment to production
 ENV NODE_ENV production
 
-# Copy Next.js files
+# Unset the build-time memory option for runtime
+ENV NODE_OPTIONS=""
+
+# Copy all necessary production files
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/start.sh ./start.sh
-
-# Copy Worker files
 COPY --from=builder /app/worker/dist ./worker/dist
 COPY --from=builder /app/worker/package.json ./worker/package.json
 COPY --from=builder /app/worker/node_modules ./worker/node_modules
