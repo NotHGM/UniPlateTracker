@@ -11,6 +11,7 @@
     "build:next": "next build",
     "build:worker": "npm run build --prefix worker",
     "start": "npm-run-all --parallel start:next start:worker start:buffer",
+    "start:docker": "next start",
     "start:next": "next start",
     "start:worker": "npm run start --prefix worker",
     "start:buffer": "node worker/dist/buffer-manager.js",

@@ -11,4 +11,4 @@ node worker/dist/index.js &
 
 # Start the Next.js application in the foreground
 echo "Starting Next.js Application..."
-npm start
+npm run start:docker
