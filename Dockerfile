@@ -1,4 +1,4 @@
-# /Dockerfile (Corrected)
+# /Dockerfile
 
 # =============================================
 # Stage 1: Build Dependencies for BOTH projects
@@ -10,6 +10,7 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci
 
+# Install worker dependencies separately
 COPY worker/package.json worker/package-lock.json* ./worker/
 RUN cd worker && npm ci
 
@@ -19,6 +20,7 @@ RUN cd worker && npm ci
 FROM node:20-alpine AS builder
 WORKDIR /app
 
+# Copy dependencies for BOTH projects from the previous stage
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/worker/node_modules ./worker/node_modules
 
@@ -50,7 +52,6 @@ WORKDIR /app
 # Set environment to production
 ENV NODE_ENV production
 
-# --- FIX: Copy ALL necessary production files for BOTH projects ---
 # Copy Next.js files
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next ./.next
@@ -62,6 +63,7 @@ COPY --from=builder /app/start.sh ./start.sh
 COPY --from=builder /app/worker/dist ./worker/dist
 COPY --from=builder /app/worker/package.json ./worker/package.json
 COPY --from=builder /app/worker/node_modules ./worker/node_modules
+COPY --from=builder /app/scripts ./scripts
 
 # Make the startup script executable
 RUN chmod +x ./start.sh
