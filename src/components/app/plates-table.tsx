@@ -1,7 +1,6 @@
-// src/components/app/plates-table.tsx (FINAL, CORRECTED VERSION)
+// src/components/app/plates-table.tsx
 "use client";
 
-// FIX 1: Import React to provide the correct types like React.ReactNode
 import React, { useState, useEffect, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { PlatesApiResponse } from "@/lib/types";
@@ -32,7 +31,6 @@ interface PlatesTableProps {
     videoCaptureEnabled: boolean;
 }
 
-// FIX 2: Change the return type to React.ReactNode to fix the "JSX" build error
 const formatPlate = (plate: string | null): React.ReactNode => {
     if (!plate) return <>{'N/A'}</>;
     plate = plate.replace(/\s/g, '');
@@ -84,7 +82,6 @@ export function PlatesTable({ initialApiData, error, appRegion, internationalApi
         if (!updateData?.lastUpdate || !lastCheckedTimestamp) return;
         const isNewDataAvailable = new Date(updateData.lastUpdate) > new Date(lastCheckedTimestamp);
         if (isNewDataAvailable) {
-            // FIX 3: Rewrote this logic to avoid the "downlevelIteration" build error
             let hasActiveFilters = false;
             searchParams.forEach((value, key) => {
                 if (key !== 'page') {
@@ -100,14 +97,22 @@ export function PlatesTable({ initialApiData, error, appRegion, internationalApi
 
     useEffect(() => {
         const timer = setTimeout(() => {
-            const current = new URLSearchParams(searchParams.toString());
-            if (filters.search) { current.set("search", filters.search); }
-            else { current.delete("search"); }
-            current.set("page", "1");
-            router.push(`${pathname}?${current.toString()}`, { scroll: false });
+            const currentParams = new URLSearchParams(searchParams.toString());
+            const searchInUrl = currentParams.get('search') || '';
+            if (filters.search !== searchInUrl) {
+                const newParams = new URLSearchParams(searchParams.toString());
+                if (filters.search) {
+                    newParams.set("search", filters.search);
+                } else {
+                    newParams.delete("search");
+                }
+                newParams.set("page", "1"); // A new search action should always reset to page 1.
+                router.push(`${pathname}?${newParams.toString()}`, { scroll: false });
+            }
         }, 500);
         return () => clearTimeout(timer);
     }, [filters.search, pathname, router, searchParams]);
+
 
     const handleApplyFilters = () => {
         const current = new URLSearchParams(searchParams.toString());
@@ -193,7 +198,6 @@ export function PlatesTable({ initialApiData, error, appRegion, internationalApi
                                         <TableCell className="pl-6 py-2">
                                             <div className="w-28 aspect-video rounded-md overflow-hidden bg-muted">
                                                 {plate.image_url ? (
-                                                    // FIX 4: Use the plate.image_url directly, without adding the base64 prefix
                                                     // eslint-disable-next-line @next/next/no-img-element
                                                     <img
                                                         src={plate.image_url}
