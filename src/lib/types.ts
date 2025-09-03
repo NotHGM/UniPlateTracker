@@ -30,6 +30,8 @@ export interface PlatesApiResponse {
         makes: string[];
         colors: string[];
         years: number[];
+        motStatuses: string[];
+        taxStatuses: string[];
     };
     error?: string;
 }

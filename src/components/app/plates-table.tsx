@@ -106,17 +106,15 @@ export function PlatesTable({ initialApiData, error, appRegion, internationalApi
                 } else {
                     newParams.delete("search");
                 }
-                newParams.set("page", "1"); // A new search action should always reset to page 1.
+                newParams.set("page", "1");
                 router.push(`${pathname}?${newParams.toString()}`, { scroll: false });
             }
         }, 500);
         return () => clearTimeout(timer);
     }, [filters.search, pathname, router, searchParams]);
 
-
     const handleApplyFilters = () => {
         const current = new URLSearchParams(searchParams.toString());
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { search, ...dropdownFilters } = filters;
         Object.entries(dropdownFilters).forEach(([key, value]) => {
             if (value && value !== 'all') { current.set(key, value); } else { current.delete(key); }
@@ -133,8 +131,8 @@ export function PlatesTable({ initialApiData, error, appRegion, internationalApi
     const handleShowNewPlates = () => { router.push(pathname); };
 
     const showVehicleDetails = appRegion === 'UK' || internationalApiEnabled;
-    const pagination = initialApiData?.pagination ?? { currentPage: 1, totalPages: 0 };
-    const filterOptions = initialApiData?.filterOptions ?? { makes: [], colors: [], years: [] };
+    const pagination = initialApiData?.pagination ?? { currentPage: 1, totalPages: 0, totalRows: 0 };
+    const filterOptions = initialApiData?.filterOptions ?? { makes: [], colors: [], years: [], motStatuses: [], taxStatuses: [] };
     const plates = displayedPlates;
 
     if (error) return <Alert variant="destructive"><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>;
@@ -159,11 +157,17 @@ export function PlatesTable({ initialApiData, error, appRegion, internationalApi
                         </Select>
                         <Select value={filters.mot} onValueChange={(v) => setFilters(f => ({ ...f, mot: v }))}>
                             <SelectTrigger className="flex-1 min-w-[120px]"><SelectValue placeholder="All MOT" /></SelectTrigger>
-                            <SelectContent><SelectItem value="all">All MOT</SelectItem><SelectItem value="Valid">Valid</SelectItem><SelectItem value="Expired">Expired</SelectItem></SelectContent>
+                            <SelectContent>
+                                <SelectItem value="all">All MOT</SelectItem>
+                                {filterOptions.motStatuses.map(status => <SelectItem key={status} value={status}>{status}</SelectItem>)}
+                            </SelectContent>
                         </Select>
                         <Select value={filters.tax} onValueChange={(v) => setFilters(f => ({ ...f, tax: v }))}>
                             <SelectTrigger className="flex-1 min-w-[120px]"><SelectValue placeholder="All Tax" /></SelectTrigger>
-                            <SelectContent><SelectItem value="all">All Tax</SelectItem><SelectItem value="Taxed">Taxed</SelectItem><SelectItem value="Not Taxed">Not Taxed</SelectItem></SelectContent>
+                            <SelectContent>
+                                <SelectItem value="all">All Tax</SelectItem>
+                                {filterOptions.taxStatuses.map(status => <SelectItem key={status} value={status}>{status}</SelectItem>)}
+                            </SelectContent>
                         </Select>
                         <div className="flex-grow"></div>
                         <div className="flex gap-2">
@@ -198,7 +202,6 @@ export function PlatesTable({ initialApiData, error, appRegion, internationalApi
                                         <TableCell className="pl-6 py-2">
                                             <div className="w-28 aspect-video rounded-md overflow-hidden bg-muted">
                                                 {plate.image_url ? (
-                                                    // eslint-disable-next-line @next/next/no-img-element
                                                     <img
                                                         src={plate.image_url}
                                                         alt={`Capture of ${plate.plate_number}`}

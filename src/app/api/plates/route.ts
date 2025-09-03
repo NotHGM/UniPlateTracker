@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     const queryParams: (string | number)[] = [];
 
     const addCondition = (field: string, value: string | number | undefined, operator = "=") => {
-        if (value !== undefined && value !== null && value !== '') {
+        if (value !== undefined && value !== null && value !== '' && value !== 'all') {
             queryParams.push(operator === 'ILIKE' ? `%${value}%` : value);
             conditions.push(`${field} ${operator} $${queryParams.length}`);
         }
@@ -60,9 +60,15 @@ export async function GET(request: NextRequest) {
         const makesQuery = "SELECT DISTINCT car_make FROM license_plates WHERE car_make IS NOT NULL ORDER BY car_make ASC";
         const colorsQuery = "SELECT DISTINCT car_color FROM license_plates WHERE car_color IS NOT NULL ORDER BY car_color ASC";
         const yearsQuery = "SELECT DISTINCT year_of_manufacture FROM license_plates WHERE year_of_manufacture IS NOT NULL ORDER BY year_of_manufacture DESC";
+        const motStatusQuery = "SELECT DISTINCT mot_status FROM license_plates WHERE mot_status IS NOT NULL AND mot_status != '' ORDER BY mot_status ASC";
+        const taxStatusQuery = "SELECT DISTINCT tax_status FROM license_plates WHERE tax_status IS NOT NULL AND tax_status != '' ORDER BY tax_status ASC";
 
-        const [makesResult, colorsResult, yearsResult] = await Promise.all([
-            client.query(makesQuery), client.query(colorsQuery), client.query(yearsQuery),
+        const [makesResult, colorsResult, yearsResult, motStatusResult, taxStatusResult] = await Promise.all([
+            client.query(makesQuery),
+            client.query(colorsQuery),
+            client.query(yearsQuery),
+            client.query(motStatusQuery),
+            client.query(taxStatusQuery),
         ]);
 
         const totalRows = parseInt(countResult.rows[0].count, 10);
@@ -74,6 +80,8 @@ export async function GET(request: NextRequest) {
                 makes: makesResult.rows.map(row => row.car_make),
                 colors: colorsResult.rows.map(row => row.car_color),
                 years: yearsResult.rows.map(row => row.year_of_manufacture),
+                motStatuses: motStatusResult.rows.map(row => row.mot_status),
+                taxStatuses: taxStatusResult.rows.map(row => row.tax_status),
             }
         });
     } catch (error: unknown) {
