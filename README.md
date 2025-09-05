@@ -119,8 +119,19 @@ PM2 is a process manager that will keep your app running in the background and r
 You can monitor your app with `pm2 list` and view logs with `pm2 logs uniplatetracker`.
 
 **Step 8: Configure the UniFi Protect Webhook**
-Finally, tell your UniFi NVR where to send detection events by creating a Custom Webhook alarm that points to `http://[YOUR_SERVER_IP]:[WORKER_PORT]/webhook`.
-
+Tell your UniFi NVR where to send detection events.
+1.  In UniFi Protect, go to **Settings > System > Other Settings**.
+2.  Under **Alarm Manager**, click **Create Alarm**.
+3.  Configure the alarm:
+    *   **Name:** `UniPlateTracker`
+    *   **Trigger:** Go to **ID > LPR** and check **Unknown Vehicles** and **Known Vehicles**.
+    *   **Scope:** Select your LPR camera(s).
+    *   **Action:**
+        *   **Webhook Type:** `Custom Webhook`
+        *   **Delivery URL:** `http://[YOUR_SERVER_IP]:[WORKER_PORT]/webhook` (e.g., `http://192.168.1.50:4000/webhook`)
+        *   **Advanced Settings > Method:** `POST`
+        *   **Advanced Settings > Enable Use Thumbnails:** Toggle **ON**.
+4.  Click **Save**.
 ---
 
 ### Method 2: Docker
