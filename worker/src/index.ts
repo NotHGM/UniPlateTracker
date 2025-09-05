@@ -49,20 +49,20 @@ async function getVehicleDetailsFromDVLA(plateNumber: string): Promise<VehicleDe
 
     try {
         const response = await axios.post<VehicleDetails>(apiUrl, data, { headers });
-        console.log(`[${plateNumber}] DVLA Check SUCCESS: Vehicle found (${response.data.make}).`);
+        console.log('[%s] DVLA Check SUCCESS: Vehicle found (%s).', plateNumber, response.data.make);
         return response.data;
     } catch (error: unknown) {
         if (isAxiosError(error) && error.response) {
-            console.warn(`[${plateNumber}] DVLA Check FAILED: Status ${error.response.status}. Plate likely invalid or not found.`);
+            console.warn('[%s] DVLA Check FAILED: Status %s. Plate likely invalid or not found.', plateNumber, error.response.status);
         } else {
-            console.error(`[${plateNumber}] DVLA API request failed with an unexpected error:`, error);
+            console.error('[%s] DVLA API request failed with an unexpected error:', plateNumber, error);
         }
         return null;
     }
 }
 
 async function getInternationalVehicleDetails(plateNumber: string): Promise<VehicleDetails | null> {
-    console.log(`[${plateNumber}] International API lookup placeholder. To implement your own, edit this function in the worker.`);
+    console.log('[%s] International API lookup placeholder. To implement your own, edit this function in the worker.', plateNumber);
     return null;
 }
 
@@ -88,7 +88,7 @@ async function processPlateData(
                  WHERE id = $13`,
                 [captureTime, thumbnailBase64, videoUrl, details?.make, details?.colour, details?.fuelType, details?.motStatus, details?.taxStatus, details?.motExpiryDate, details?.taxDueDate, details?.yearOfManufacture, details?.monthOfFirstRegistration, plateId]
             );
-            console.log(`[${plateNumber}] Updated record in database.`);
+            console.log('[%s] Updated record in database.', plateNumber);
         } else {
             await client.query(
                 `INSERT INTO license_plates (
@@ -98,14 +98,16 @@ async function processPlateData(
                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
                 [plateNumber, captureTime, captureTime, thumbnailBase64, videoUrl, details?.make, details?.colour, details?.fuelType, details?.motStatus, details?.taxStatus, details?.motExpiryDate, details?.taxDueDate, details?.yearOfManufacture, details?.monthOfFirstRegistration]
             );
-            console.log(`[${plateNumber}] Created new record in database.`);
+            console.log('[%s] Created new record in database.', plateNumber);
         }
 
         await client.query('UPDATE app_state SET last_plate_update = NOW() WHERE id = 1');
         await client.query('COMMIT');
     } catch (error) {
         await client.query('ROLLBACK');
-        if (error instanceof Error) { console.error(`[${plateNumber}] Database Transaction Error:`, error.message); }
+        if (error instanceof Error) {
+            console.error('[%s] Database Transaction Error:', plateNumber, error.message);
+        }
     } finally {
         client.release();
     }
@@ -120,13 +122,14 @@ app.post('/webhook', async (req, res) => {
     const eventTime = new Date();
     const payload = req.body;
 
-    console.log(`\n--- LPR Webhook Received at ${eventTime.toLocaleTimeString()} (Region: ${APP_REGION}) ---`);
+    console.log('\n--- LPR Webhook Received at %s (Region: %s) ---', eventTime.toLocaleTimeString(), APP_REGION);
 
     const plateNumber = payload?.alarm?.triggers?.[0]?.value;
     if (plateNumber) {
-        const sanitizedPlate = plateNumber.toUpperCase().replace(/\s/g, '');
+        // Strict alphanumeric sanitization to prevent any path traversal characters
+        const sanitizedPlate = plateNumber.toUpperCase().replace(/[^A-Z0-9]/g, '');
         const thumbnail = payload?.alarm?.thumbnail;
-        console.log(`SUCCESS: Extracted Plate: ${sanitizedPlate}`);
+        console.log('SUCCESS: Extracted Plate: %s', sanitizedPlate);
 
         let proceedToSave = false;
         let vehicleDetails: VehicleDetails | null = null;
@@ -136,7 +139,7 @@ app.post('/webhook', async (req, res) => {
             if (vehicleDetails) {
                 proceedToSave = true;
             } else {
-                console.log(`[${sanitizedPlate}] Plate rejected by DVLA validation. IGNORING ENTRY.`);
+                console.log('[%s] Plate rejected by DVLA validation. IGNORING ENTRY.', sanitizedPlate);
             }
         } else {
             proceedToSave = true;
@@ -150,9 +153,9 @@ app.post('/webhook', async (req, res) => {
             if (ENABLE_VIDEO_CAPTURE === 'true') {
                 try {
                     videoUrl = await captureVideo(sanitizedPlate, eventTime);
-                    console.log(`[${sanitizedPlate}] 🎥 Video capture successful: ${videoUrl}`);
+                    console.log('[%s] 🎥 Video capture successful: %s', sanitizedPlate, videoUrl);
                 } catch (error) {
-                    console.error(`[${sanitizedPlate}] 🔴 Video capture FAILED. Proceeding to save DB record without video.`, error);
+                    console.error('[%s] 🔴 Video capture FAILED. Proceeding to save DB record without video.', sanitizedPlate, error);
                     videoUrl = null;
                 }
             }
@@ -164,7 +167,7 @@ app.post('/webhook', async (req, res) => {
 });
 
 app.listen(port, () => {
-    console.log(`Worker listening for UniFi Protect LPR webhooks on port ${port}`);
+    console.log('Worker listening for UniFi Protect LPR webhooks on port %s', port);
     if (ENABLE_VIDEO_CAPTURE === 'true') {
         console.log('📹 On-demand video capture is enabled.');
     }

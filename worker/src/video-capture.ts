@@ -22,14 +22,14 @@ async function generateThumbnail(videoPath: string): Promise<void> {
         const thumbnailPath = `${videoPath}.jpg`;
         const ffmpegArgs = ['-i', videoPath, '-ss', '00:00:01.000', '-vframes', '1', '-q:v', '2', thumbnailPath];
 
-        console.log(`🖼️ Generating thumbnail for ${path.basename(videoPath)}`);
+        console.log('🖼️ Generating thumbnail for %s', path.basename(videoPath));
         const ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
 
         ffmpegProcess.on('close', (code) => {
             if (code === 0) {
-                console.log(`✅ Thumbnail generated successfully: ${path.basename(thumbnailPath)}`);
+                console.log('✅ Thumbnail generated successfully: %s', path.basename(thumbnailPath));
             } else {
-                console.error(`🔴 FFmpeg thumbnail generation exited with code ${code}`);
+                console.error('🔴 FFmpeg thumbnail generation exited with code %s', code);
             }
             resolve();
         });
@@ -40,7 +40,7 @@ export async function captureVideo(plate: string, eventTime: Date): Promise<stri
     const finalFilename = `${plate}_${eventTime.toISOString().replace(/:/g, '-')}.mp4`;
     const finalOutputPath = path.join(finalCapturePath, finalFilename);
 
-    console.log(`🎬 Initializing video capture for plate: ${plate}`);
+    console.log('🎬 Initializing video capture for plate: %s', plate);
 
     try {
         await delay(POST_EVENT_SECONDS * 1000 + 2000);
@@ -53,7 +53,7 @@ export async function captureVideo(plate: string, eventTime: Date): Promise<stri
         const listFilePath = path.join(bufferPath, 'templist.txt');
         await writeFile(listFilePath, fileListContent);
 
-        console.log(`📋 Generated segment list for stitching.`);
+        console.log('📋 Generated segment list for stitching.');
         const eventTimestamp = eventTime.getTime();
         const startTimeMillis = eventTimestamp - (PRE_EVENT_SECONDS * 1000);
         const firstSegmentName = relevantSegments[0];
@@ -65,11 +65,10 @@ export async function captureVideo(plate: string, eventTime: Date): Promise<stri
 
         const finalSeekTime = Math.max(0, seekTime);
 
-        // This promise will now resolve with either a filename (string) or null
         await new Promise<void>((resolve, reject) => {
             const ffmpegArgs = [ '-f', 'concat', '-safe', '0', '-i', listFilePath, '-ss', finalSeekTime.toString(), '-t', captureDuration.toString(), '-c', 'copy', finalOutputPath ];
 
-            console.log(`🏃 Running FFmpeg stitch command for ${finalFilename}`);
+            console.log('🏃 Running FFmpeg stitch command for %s', finalFilename);
             const ffmpegProcess = spawn('ffmpeg', ffmpegArgs);
 
             ffmpegProcess.on('close', async (code) => {
@@ -78,22 +77,22 @@ export async function captureVideo(plate: string, eventTime: Date): Promise<stri
                 if (code === 0) {
                     try {
                         const stats = await stat(finalOutputPath);
-                        console.log(`[${plate}] Video file created. Size: ${(stats.size / 1024).toFixed(1)} KB.`);
+                        console.log('[%s] Video file created. Size: %s KB.', plate, (stats.size / 1024).toFixed(1));
                         if (stats.size > MINIMUM_FILE_SIZE_BYTES) {
-                            console.log(`[${plate}] ✅ Video size is valid. Proceeding with thumbnail.`);
+                            console.log('[%s] ✅ Video size is valid. Proceeding with thumbnail.', plate);
                             await generateThumbnail(finalOutputPath);
                             resolve();
                         } else {
-                            console.warn(`[${plate}] ⚠️ Video size is too small. Discarding corrupt file.`);
+                            console.warn('[%s] ⚠️ Video size is too small. Discarding corrupt file.', plate);
                             await unlink(finalOutputPath);
                             resolve();
                         }
                     } catch (statError) {
-                        console.error(`[${plate}] 🔴 Could not check file stats for video.`, statError);
+                        console.error('[%s] 🔴 Could not check file stats for video.', plate, statError);
                         reject(statError);
                     }
                 } else {
-                    console.error(`🔴 FFmpeg stitch process exited with code ${code}`);
+                    console.error('🔴 FFmpeg stitch process exited with code %s', code);
                     reject(new Error(`FFmpeg exited with code ${code}`));
                 }
             });
@@ -107,7 +106,7 @@ export async function captureVideo(plate: string, eventTime: Date): Promise<stri
         }
 
     } catch (error) {
-        console.error(`🔴 Fatal error during video capture process for ${plate}:`, error);
+        console.error('🔴 Fatal error during video capture process for %s:', plate, error);
         return null;
     }
 }
