@@ -1,6 +1,6 @@
 {
   "name": "uniplatetracker",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "scripts": {
     "dev": "PORT=3007 npm-run-all --parallel dev:next dev:worker dev:buffer",
