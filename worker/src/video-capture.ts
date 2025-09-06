@@ -37,7 +37,9 @@ async function generateThumbnail(videoPath: string): Promise<void> {
 }
 
 export async function captureVideo(plate: string, eventTime: Date): Promise<string | null> {
-    const finalFilename = `${plate}_${eventTime.toISOString().replace(/:/g, '-')}.mp4`;
+    const sanitizedPlate = plate.replace(/[^a-zA-Z0-9]/g, '_');
+
+    const finalFilename = `${sanitizedPlate}_${eventTime.toISOString().replace(/:/g, '-')}.mp4`;
     const finalOutputPath = path.join(finalCapturePath, finalFilename);
 
     console.log('🎬 Initializing video capture for plate: %s', plate);
