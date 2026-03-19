@@ -2,10 +2,25 @@
 import type { NextConfig } from "next";
 
 const isProduction = process.env.NODE_ENV === 'production';
-const allowedDevOrigins = (process.env.NEXT_ALLOWED_DEV_ORIGINS || '')
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean);
+const allowedDevOrigins = Array.from(new Set([
+    'localhost',
+    '127.0.0.1',
+    ...(process.env.NEXT_ALLOWED_DEV_ORIGINS || '')
+        .split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean)
+        .flatMap((origin) => {
+            if (origin.startsWith('http://') || origin.startsWith('https://')) {
+                try {
+                    const parsed = new URL(origin);
+                    return [origin, parsed.hostname];
+                } catch {
+                    return [origin];
+                }
+            }
+            return [origin, `http://${origin}`, `https://${origin}`];
+        }),
+]));
 
 const ContentSecurityPolicy = `
   default-src 'self';
