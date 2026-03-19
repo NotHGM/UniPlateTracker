@@ -5,15 +5,33 @@ import bcrypt from 'bcrypt';
 import { getIronSession } from 'iron-session';
 import { cookies } from 'next/headers';
 import { sessionOptions, SessionData } from '@/lib/session';
+import { isSameOriginRequest, AdminEmailSchema } from '@/lib/security';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
-    const { email, password } = await req.json();
+    if (!isSameOriginRequest(req)) {
+        return NextResponse.json({ message: 'Invalid request origin.' }, { status: 403 });
+    }
+
+    let body: { email?: unknown; password?: unknown };
+    try {
+        body = await req.json();
+    } catch {
+        return NextResponse.json({ message: 'Invalid JSON body.' }, { status: 400 });
+    }
+
+    const email = AdminEmailSchema.parse(body.email);
+    const password = typeof body.password === 'string' ? body.password : null;
+
     if (!email || !password) {
         return NextResponse.json({ message: 'Email and password are required.' }, { status: 400 });
     }
-    const lowerCaseEmail = email.toLowerCase();
+    if (password.length < 8) {
+        return NextResponse.json({ message: 'Password must be at least 8 characters long.' }, { status: 400 });
+    }
+
+    const lowerCaseEmail = email;
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
@@ -29,7 +47,7 @@ export async function POST(req: NextRequest) {
         const newUserRes = await client.query('INSERT INTO admin_users (email, password_hash) VALUES ($1, $2) RETURNING id, email', [lowerCaseEmail, passwordHash]);
         const newUser = newUserRes.rows[0];
         // @ts-ignore
-        const session = await getIronSession<SessionData>(cookies(), sessionOptions);
+        const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
         session.user = { id: newUser.id, email: newUser.email };
         await session.save();
         await client.query('COMMIT');

@@ -4,10 +4,11 @@ import pool from '@/lib/db';
 import { getIronSession } from 'iron-session';
 import { cookies } from 'next/headers';
 import { sessionOptions, SessionData } from '@/lib/session';
+import { AdminEmailSchema, isSameOriginRequest } from '@/lib/security';
 
 export async function GET() {
     // @ts-ignore
-    const session = await getIronSession<SessionData>(cookies(), sessionOptions);
+    const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
     if (!session.user) {
         return new NextResponse(JSON.stringify({ error: 'Forbidden' }), { status: 403 });
     }
@@ -31,17 +32,29 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+    if (!isSameOriginRequest(req)) {
+        return NextResponse.json({ error: 'Invalid request origin.' }, { status: 403 });
+    }
+
     // @ts-ignore
-    const session = await getIronSession<SessionData>(cookies(), sessionOptions);
+    const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
     const currentUser = session.user;
     if (!currentUser) {
         return new NextResponse(JSON.stringify({ error: 'Forbidden' }), { status: 403 });
     }
-    const { email } = await req.json();
-    if (!email || typeof email !== 'string') {
+
+    let body: { email?: unknown };
+    try {
+        body = await req.json();
+    } catch {
+        return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+
+    const sanitizedEmail = AdminEmailSchema.parse(body.email);
+    if (!sanitizedEmail) {
         return new NextResponse(JSON.stringify({ error: 'Invalid email' }), { status: 400 });
     }
-    const sanitizedEmail = email.toLowerCase().trim();
+
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
@@ -63,12 +76,25 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+    if (!isSameOriginRequest(req)) {
+        return NextResponse.json({ error: 'Invalid request origin.' }, { status: 403 });
+    }
+
     // @ts-ignore
-    const session = await getIronSession<SessionData>(cookies(), sessionOptions);
+    const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
     const currentUser = session.user;
     if (!currentUser) return new NextResponse(JSON.stringify({ error: 'Forbidden' }), { status: 403 });
-    const { emailToRevoke } = await req.json();
+
+    let body: { emailToRevoke?: unknown };
+    try {
+        body = await req.json();
+    } catch {
+        return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+
+    const emailToRevoke = AdminEmailSchema.parse(body.emailToRevoke);
     if (!emailToRevoke) return new NextResponse(JSON.stringify({ error: 'Invalid email' }), { status: 400 });
+
     if (currentUser.email === emailToRevoke) return new NextResponse(JSON.stringify({ error: "Cannot revoke yourself." }), { status: 403 });
     const client = await pool.connect();
     try {

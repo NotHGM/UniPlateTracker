@@ -5,6 +5,9 @@ import { stat } from 'fs/promises';
 import { Readable } from 'stream';
 import path from 'path';
 
+const SAFE_FILENAME_REGEX = /^[a-zA-Z0-9._-]+$/;
+const ALLOWED_EXTENSIONS = new Set(['.mp4', '.jpg']);
+
 function streamFile(fullPath: string, fileStat: Stats, contentType: string): NextResponse {
     const nodeStream = createReadStream(fullPath);
     const webStream = Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>;
@@ -35,8 +38,13 @@ export async function GET(request: NextRequest) {
 
     const sanitizedFilename = path.basename(filename);
 
-    if (sanitizedFilename !== filename) {
+    if (sanitizedFilename !== filename || !SAFE_FILENAME_REGEX.test(sanitizedFilename)) {
         return new NextResponse(JSON.stringify({ error: 'Invalid filename' }), { status: 400 });
+    }
+
+    const fileExtension = path.extname(sanitizedFilename).toLowerCase();
+    if (!ALLOWED_EXTENSIONS.has(fileExtension)) {
+        return new NextResponse(JSON.stringify({ error: 'Unsupported file type' }), { status: 400 });
     }
 
     const isThumbnailRequest = sanitizedFilename.endsWith('.jpg');

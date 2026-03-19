@@ -7,7 +7,7 @@ import { sessionOptions, SessionData } from '@/lib/session';
 
 export async function GET() {
     // @ts-ignore
-    const session = await getIronSession<SessionData>(cookies(), sessionOptions);
+    const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
     const currentUser = session.user;
     if (!currentUser) {
         return new NextResponse(JSON.stringify({ error: 'Forbidden' }), { status: 403 });

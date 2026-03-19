@@ -5,8 +5,9 @@ export const sessionOptions: SessionOptions = {
     cookieName: 'uniplate-session',
     password: process.env.SESSION_SECRET as string,
     cookieOptions: {
-        secure: false,
+        secure: process.env.NODE_ENV === 'production',
         httpOnly: true,
+        sameSite: 'lax',
     },
 };
 

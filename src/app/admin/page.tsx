@@ -14,7 +14,7 @@ import { getAdminStats } from '@/lib/data';
 
 export default async function AdminDashboardPage() {
     // @ts-ignore
-    const session = await getIronSession<SessionData>(cookies(), sessionOptions);
+    const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
     if (!session.user) {
         redirect("/admin/auth");
     }
