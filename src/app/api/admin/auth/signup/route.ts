@@ -35,8 +35,12 @@ export async function POST(req: NextRequest) {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
+        const approvedCountRes = await client.query<{ count: string }>('SELECT COUNT(*)::text AS count FROM approved_emails');
+        const approvedCount = Number.parseInt(approvedCountRes.rows[0]?.count ?? '0', 10);
+        const isBootstrapSignup = approvedCount === 0;
+
         const approvedRes = await client.query('SELECT id FROM approved_emails WHERE email = $1', [lowerCaseEmail]);
-        if (approvedRes.rows.length === 0) {
+        if (!isBootstrapSignup && approvedRes.rows.length === 0) {
             return NextResponse.json({ message: 'This email is not approved for signup.' }, { status: 403 });
         }
         const existingUserRes = await client.query('SELECT id FROM admin_users WHERE email = $1', [lowerCaseEmail]);
@@ -46,6 +50,11 @@ export async function POST(req: NextRequest) {
         const passwordHash = await bcrypt.hash(password, 12);
         const newUserRes = await client.query('INSERT INTO admin_users (email, password_hash) VALUES ($1, $2) RETURNING id, email', [lowerCaseEmail, passwordHash]);
         const newUser = newUserRes.rows[0];
+
+        if (isBootstrapSignup) {
+            await client.query('INSERT INTO approved_emails (email, added_by) VALUES ($1, NULL) ON CONFLICT (email) DO NOTHING', [lowerCaseEmail]);
+        }
+
         // @ts-ignore
         const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
         session.user = { id: newUser.id, email: newUser.email };
