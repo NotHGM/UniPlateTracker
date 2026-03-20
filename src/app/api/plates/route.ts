@@ -2,6 +2,7 @@
 import { NextResponse, NextRequest } from 'next/server';
 import pool from '@/lib/db';
 import { z } from 'zod';
+import type { PoolClient } from 'pg';
 
 const QuerySchema = z.object({
     page: z.coerce.number().int().min(1).default(1),
@@ -47,15 +48,18 @@ export async function GET(request: NextRequest) {
     addCondition('mot_status', mot);
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-    const client = await pool.connect();
+    let client: PoolClient | null = null;
     try {
+        const dbClient: PoolClient = await pool.connect();
+        client = dbClient;
+
         const dataQuery = `SELECT * FROM license_plates ${whereClause} ORDER BY recent_capture_time DESC LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
-        const dataResult = await client.query(dataQuery, [...queryParams, limit, offset]);
+        const dataResult = await dbClient.query(dataQuery, [...queryParams, limit, offset]);
 
         const countQuery = `SELECT COUNT(*) FROM license_plates ${whereClause}`;
-        const countResult = await client.query(countQuery, queryParams);
+        const countResult = await dbClient.query(countQuery, queryParams);
 
-        const stateResult = await client.query('SELECT last_plate_update FROM app_state WHERE id = 1');
+        const stateResult = await dbClient.query('SELECT last_plate_update FROM app_state WHERE id = 1');
 
         const makesQuery = "SELECT DISTINCT car_make FROM license_plates WHERE car_make IS NOT NULL ORDER BY car_make ASC";
         const colorsQuery = "SELECT DISTINCT car_color FROM license_plates WHERE car_color IS NOT NULL ORDER BY car_color ASC";
@@ -64,11 +68,11 @@ export async function GET(request: NextRequest) {
         const taxStatusQuery = "SELECT DISTINCT tax_status FROM license_plates WHERE tax_status IS NOT NULL AND tax_status != '' ORDER BY tax_status ASC";
 
         const [makesResult, colorsResult, yearsResult, motStatusResult, taxStatusResult] = await Promise.all([
-            client.query(makesQuery),
-            client.query(colorsQuery),
-            client.query(yearsQuery),
-            client.query(motStatusQuery),
-            client.query(taxStatusQuery),
+            dbClient.query(makesQuery),
+            dbClient.query(colorsQuery),
+            dbClient.query(yearsQuery),
+            dbClient.query(motStatusQuery),
+            dbClient.query(taxStatusQuery),
         ]);
 
         const totalRows = parseInt(countResult.rows[0].count, 10);
@@ -88,6 +92,6 @@ export async function GET(request: NextRequest) {
         console.error('API Error fetching plates:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     } finally {
-        client.release();
+        client?.release();
     }
 }

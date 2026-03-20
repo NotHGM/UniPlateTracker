@@ -5,9 +5,17 @@ declare global {
     var pool: Pool | undefined;
 }
 
-const isProduction = process.env.NODE_ENV === 'production';
-const shouldUseSsl = isProduction || process.env.POSTGRES_SSL === 'true';
-const rejectUnauthorized = process.env.POSTGRES_SSL_REJECT_UNAUTHORIZED !== 'false';
+const parseBooleanEnv = (value: string | undefined, defaultValue: boolean): boolean => {
+    if (value === undefined) {
+        return defaultValue;
+    }
+
+    return value.toLowerCase() === 'true';
+};
+
+// Respect explicit deployment config instead of forcing SSL in production.
+const shouldUseSsl = parseBooleanEnv(process.env.POSTGRES_SSL, false);
+const rejectUnauthorized = parseBooleanEnv(process.env.POSTGRES_SSL_REJECT_UNAUTHORIZED, true);
 
 const pool = global.pool || new Pool({
     connectionString: process.env.POSTGRES_URL,

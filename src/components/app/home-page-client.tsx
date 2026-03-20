@@ -10,10 +10,25 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 const fetcher = async (url: string) => {
     const res = await fetch(url);
-    const data = await res.json();
+    const text = await res.text();
+    let data: any = null;
+
+    if (text) {
+        try {
+            data = JSON.parse(text);
+        } catch {
+            data = null;
+        }
+    }
+
     if (!res.ok) {
         throw new Error(data?.error || data?.message || 'Failed to load dashboard data.');
     }
+
+    if (!data) {
+        throw new Error('Received an empty response from the server.');
+    }
+
     return data;
 };
 
