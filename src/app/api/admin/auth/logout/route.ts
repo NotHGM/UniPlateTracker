@@ -4,15 +4,19 @@ import { NextRequest } from 'next/server';
 import { getIronSession } from 'iron-session';
 import { cookies } from 'next/headers';
 import { sessionOptions, SessionData } from '@/lib/session';
-import { isSameOriginRequest } from '@/lib/security';
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
-    if (!isSameOriginRequest(req)) {
-        return NextResponse.json({ message: 'Invalid request origin.' }, { status: 403 });
-    }
+    void req;
 
+    const cookieStore = await cookies();
     // @ts-ignore
-    const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
+    const session = await getIronSession<SessionData>(cookieStore, sessionOptions);
     session.destroy();
+
+    // Ensure stale cookies are removed even if session destroy cannot decrypt previous values.
+    cookieStore.delete(sessionOptions.cookieName);
+
     return NextResponse.json({ message: "Logout successful" });
 }

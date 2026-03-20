@@ -18,22 +18,32 @@ function normalizeHost(value: string): string {
 function parseAllowedOriginHosts(): Set<string> {
     const hosts = new Set<string>();
     const raw = process.env.NEXT_ALLOWED_DEV_ORIGINS;
+    const canonicalAppUrl = process.env.NEXTAUTH_URL;
 
     if (!raw) {
-        return hosts;
+        // Continue to parse canonical URL below even without explicit allowlist.
+    } else {
+        for (const entry of raw.split(',')) {
+            const cleaned = entry.trim();
+            if (!cleaned) {
+                continue;
+            }
+
+            try {
+                const parsed = new URL(cleaned.includes('://') ? cleaned : `http://${cleaned}`);
+                hosts.add(normalizeHost(parsed.host));
+            } catch {
+                // Ignore malformed entries in allowlist.
+            }
+        }
     }
 
-    for (const entry of raw.split(',')) {
-        const cleaned = entry.trim();
-        if (!cleaned) {
-            continue;
-        }
-
+    if (canonicalAppUrl) {
         try {
-            const parsed = new URL(cleaned.includes('://') ? cleaned : `http://${cleaned}`);
+            const parsed = new URL(canonicalAppUrl);
             hosts.add(normalizeHost(parsed.host));
         } catch {
-            // Ignore malformed entries in allowlist.
+            // Ignore malformed canonical URL.
         }
     }
 
@@ -74,6 +84,12 @@ export function isSameOriginRequest(request: NextRequest): boolean {
 
         const allowedHosts = parseAllowedOriginHosts();
         if (allowedHosts.has(originHost)) {
+            return true;
+        }
+
+        // In proxy deployments, Fetch metadata can still confirm browser same-site intent.
+        const fetchSite = request.headers.get('sec-fetch-site');
+        if (fetchSite === 'same-origin' || fetchSite === 'same-site' || fetchSite === 'none') {
             return true;
         }
 
