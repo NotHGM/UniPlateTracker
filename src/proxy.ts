@@ -1,12 +1,11 @@
-// src/middleware.ts
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { sessionOptions } from '@/lib/session';
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
-    // Check if the session cookie exists, without trying to decrypt it.
+    // Check if the session cookie exists without decrypting it in the edge layer.
     const cookie = request.cookies.get(sessionOptions.cookieName);
     const isLoggedIn = cookie !== undefined;
 

@@ -6,8 +6,31 @@ import useSWR from 'swr';
 import { useSearchParams } from 'next/navigation';
 import { PlatesTable } from "@/components/app/plates-table";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 
-const fetcher = (url: string) => fetch(url).then(res => res.json());
+const fetcher = async (url: string) => {
+    const res = await fetch(url);
+    const text = await res.text();
+    let data: any = null;
+
+    if (text) {
+        try {
+            data = JSON.parse(text);
+        } catch {
+            data = null;
+        }
+    }
+
+    if (!res.ok) {
+        throw new Error(data?.error || data?.message || 'Failed to load dashboard data.');
+    }
+
+    if (!data) {
+        throw new Error('Received an empty response from the server.');
+    }
+
+    return data;
+};
 
 type HomePageClientProps = {
     appRegion: 'UK' | 'INTERNATIONAL';
@@ -44,5 +67,11 @@ export function HomePageClient({
             />
         );
     }
-    return null;
+
+    return (
+        <div className="space-y-4">
+            <Skeleton className="h-[140px] w-full" />
+            <Skeleton className="h-[600px] w-full" />
+        </div>
+    );
 }

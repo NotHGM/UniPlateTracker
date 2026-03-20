@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
     // @ts-ignore
-    const session = await getIronSession<SessionData>(cookies(), sessionOptions);
+    const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
 
     if (!session.user) {
         return new NextResponse(JSON.stringify({ error: 'Forbidden' }), { status: 403 });

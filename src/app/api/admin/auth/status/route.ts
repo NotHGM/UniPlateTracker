@@ -6,7 +6,7 @@ import { sessionOptions, SessionData } from '@/lib/session';
 
 export async function GET() {
     // @ts-ignore
-    const session = await getIronSession<SessionData>(cookies(), sessionOptions);
+    const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
     if (session.user) {
         return NextResponse.json({ isLoggedIn: true });
     } else {

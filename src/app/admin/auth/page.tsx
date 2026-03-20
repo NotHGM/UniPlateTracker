@@ -2,7 +2,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +10,6 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2 } from 'lucide-react';
 
 export default function AuthPage() {
-    const router = useRouter();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [message, setMessage] = useState({ type: '', text: '' });
@@ -36,10 +34,8 @@ export default function AuthPage() {
 
             setMessage({ type: 'success', text: data.message });
 
-            // SIMPLIFIED REDIRECT: Just push to the new route.
-            setTimeout(() => {
-                router.push('/admin');
-            }, 1000);
+            // Use a full-page redirect so server auth state is evaluated immediately.
+            window.location.assign('/admin');
 
         } catch (error: unknown) {
             const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred.';
