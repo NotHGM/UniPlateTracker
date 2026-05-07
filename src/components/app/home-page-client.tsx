@@ -1,9 +1,8 @@
-// src/components/app/home-page-client.tsx
 "use client";
 
 import { useMemo } from "react";
-import useSWR from 'swr';
-import { useSearchParams } from 'next/navigation';
+import useSWR from "swr";
+import { useSearchParams } from "next/navigation";
 import { PlatesTable } from "@/components/app/plates-table";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,38 +21,40 @@ const fetcher = async (url: string) => {
     }
 
     if (!res.ok) {
-        throw new Error(data?.error || data?.message || 'Failed to load dashboard data.');
+        throw new Error(data?.error || data?.message || "Failed to load dashboard data.");
     }
 
     if (!data) {
-        throw new Error('Received an empty response from the server.');
+        throw new Error("Received an empty response from the server.");
     }
 
     return data;
 };
 
 type HomePageClientProps = {
-    appRegion: 'UK' | 'INTERNATIONAL';
+    appRegion: "UK" | "INTERNATIONAL";
     internationalApiEnabled: boolean;
     videoCaptureEnabled: boolean;
 };
 
 export function HomePageClient({
-                                   appRegion,
-                                   internationalApiEnabled,
-                                   videoCaptureEnabled
-                               }: HomePageClientProps) {
-
+    appRegion,
+    internationalApiEnabled,
+    videoCaptureEnabled,
+}: HomePageClientProps) {
     const searchParams = useSearchParams();
 
-    const query = useMemo(() => {
-        return searchParams.toString();
-    }, [searchParams]);
+    const query = useMemo(() => searchParams.toString(), [searchParams]);
 
     const { data: apiData, error: apiError } = useSWR(`/api/plates?${query}`, fetcher);
 
     if (apiError) {
-        return <Alert variant="destructive"><AlertTitle>Error Loading Plates</AlertTitle><AlertDescription>{apiError.message}</AlertDescription></Alert>;
+        return (
+            <Alert variant="destructive">
+                <AlertTitle>Error loading plates</AlertTitle>
+                <AlertDescription>{apiError.message}</AlertDescription>
+            </Alert>
+        );
     }
 
     if (apiData) {

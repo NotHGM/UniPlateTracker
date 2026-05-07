@@ -1,17 +1,13 @@
-// src/components/admin/dashboard-client.tsx
-"use client"
+"use client";
 
-import { Car, Palette, Timer, Fingerprint } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Activity, Car, Fingerprint, Palette, Timer } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatCard } from "./stat-card";
 import { AdminManagement } from "./admin-management";
 import { AdminActivityLog } from "./admin-activity-log";
-import { Bar, BarChart, ResponsiveContainer, XAxis, Tooltip, CartesianGrid } from 'recharts';
-import useSWR from 'swr';
+import { DetectionsChart } from "./detections-chart";
+import useSWR from "swr";
 
-// Type definitions are good practice and are kept.
-interface HourlyData { name: string; count: number; }
 interface Admin { email: string; added_by_email: string | null; }
 interface AdminStats {
     totalPlates: number;
@@ -20,45 +16,11 @@ interface AdminStats {
     mostCommonMake: string;
     mostCommonColor: string;
     detectionsByHour?: { hour: string; count: number }[];
+    detectionsByDay?: { day: string; count: number }[];
 }
 
-// With the new ESLint rule, using 'any' here will now be a warning, not a build-breaking error.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-        const count = payload[0].value;
-        const detectionText = count === 1 ? 'detection' : 'detections';
-        return (
-            <div className="p-2 text-sm bg-background/90 backdrop-blur-sm border rounded-lg shadow-lg">
-                <p className="font-bold">{`${count} ${detectionText}`}</p>
-                <p className="text-muted-foreground">{`Hour: ${label}:00`}</p>
-            </div>
-        );
-    }
-    return null;
-};
-
-const DetectionsChart = ({ data }: { data: HourlyData[] }) => {
-    return (
-        <Card>
-            <CardHeader><CardTitle>Detections in the Last 24 Hours</CardTitle></CardHeader>
-            <CardContent className="pl-2">
-                <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={data} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                        <defs><linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8} /><stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.1} /></linearGradient></defs>
-                        <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="hsl(var(--muted) / 0.5)" />
-                        <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
-                        <Tooltip cursor={{ fill: 'hsl(var(--muted) / 0.3)', radius: 4 }} content={<CustomTooltip />} />
-                        <Bar dataKey="count" fill="url(#barGradient)" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                </ResponsiveContainer>
-            </CardContent>
-        </Card>
-    );
-};
-
 export function DashboardClient({ stats, currentUserEmail }: { stats: AdminStats | null, currentUserEmail: string }) {
-    const { data } = useSWR('/api/admin/management', (url) => fetch(url).then(res => res.json()));
+    const { data } = useSWR("/api/admin/management", (url) => fetch(url).then((res) => res.json()));
     const admins: Admin[] | undefined = data?.admins;
     const amIInitialAdmin = admins?.find((admin) => admin.email === currentUserEmail)?.added_by_email === null;
 
@@ -66,45 +28,32 @@ export function DashboardClient({ stats, currentUserEmail }: { stats: AdminStats
         return (
             <div className="space-y-6">
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-                    <Skeleton className="h-[126px]" /> <Skeleton className="h-[126px]" /> <Skeleton className="h-[126px]" /> <Skeleton className="h-[126px]" /> <Skeleton className="h-[126px]" />
+                    <Skeleton className="h-[120px]" />
+                    <Skeleton className="h-[120px]" />
+                    <Skeleton className="h-[120px]" />
+                    <Skeleton className="h-[120px]" />
+                    <Skeleton className="h-[120px]" />
                 </div>
                 <Skeleton className="h-[400px]" />
             </div>
         );
     }
 
-    const processHourlyData = (data: { hour: string; count: number }[] | undefined): HourlyData[] => {
-        const hourlyMap = new Map<string, number>();
-        for (let i = 0; i < 24; i++) {
-            hourlyMap.set(i.toString().padStart(2, '0'), 0);
-        }
-        if (data && Array.isArray(data)) {
-            data.forEach(item => {
-                if (item && typeof item.hour === 'string') {
-                    const hourKey = item.hour.substring(0, 2);
-                    if (hourlyMap.has(hourKey)) hourlyMap.set(hourKey, item.count);
-                }
-            });
-        }
-        return Array.from(hourlyMap.entries())
-            .map(([hour, count]) => ({ name: hour, count: count }))
-            .sort((a, b) => a.name.localeCompare(b.name));
-    };
-
-    const processedChartData = processHourlyData(stats.detectionsByHour);
-
     return (
         <div className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-                <StatCard title="Total Detections" value={stats.totalPlates} icon={Car} />
-                <StatCard title="Unique Plates" value={stats.uniquePlates} icon={Fingerprint} />
-                <StatCard title="Detections Today" value={stats.detectionsToday} icon={Timer} />
-                <StatCard title="Most Common Make" value={stats.mostCommonMake} icon={Car} />
-                <StatCard title="Most Common Color" value={stats.mostCommonColor} icon={Palette} />
+                <StatCard title="Total detections" value={stats.totalPlates} icon={Activity} />
+                <StatCard title="Unique plates" value={stats.uniquePlates} icon={Fingerprint} />
+                <StatCard title="Detections today" value={stats.detectionsToday} icon={Timer} />
+                <StatCard title="Most common make" value={stats.mostCommonMake} icon={Car} />
+                <StatCard title="Most common color" value={stats.mostCommonColor} icon={Palette} />
             </div>
-            <DetectionsChart data={processedChartData} />
+            <DetectionsChart
+                detectionsByHour={stats.detectionsByHour ?? []}
+                detectionsByDay={stats.detectionsByDay ?? []}
+            />
             <AdminManagement currentUserEmail={currentUserEmail} />
-            {amIInitialAdmin && ( <AdminActivityLog /> )}
+            {amIInitialAdmin && <AdminActivityLog />}
         </div>
     );
 }

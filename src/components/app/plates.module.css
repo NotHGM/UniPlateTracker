@@ -1,13 +1,12 @@
 /* src/components/app/plates.module.css */
 
-/* --- Minimal UK Plate Style --- */
 .ukPlateStyle {
-    font-family: var(--font-charles-wright);
-    background-color: #FBBF24; /* amber-400 */
+    font-family: var(--font-plate);
+    background-color: #FBBF24;
     color: #000000;
     padding: 0.2rem 0.75rem;
     border-radius: 0.3rem;
-    border: 1px solid #737373; /* neutral-500 */
+    border: 1px solid #737373;
     display: inline-block;
     text-transform: uppercase;
     font-weight: 700;
@@ -16,14 +15,13 @@
     white-space: nowrap;
 }
 
-/* --- American-Style International Plate --- */
 .intlPlateStyle {
-    font-family: 'Helvetica', sans-serif; /* A more standard font */
-    background: linear-gradient(to bottom, #FFFFFF, #E5E5E5); /* White gradient */
-    color: #172554; /* Dark Blue text */
+    font-family: 'Helvetica Neue', Helvetica, sans-serif;
+    background: linear-gradient(to bottom, #FFFFFF, #E5E5E5);
+    color: #172554;
     padding: 0.2rem 0.75rem;
     border-radius: 0.3rem;
-    border: 1px solid #D4D4D4; /* neutral-300 */
+    border: 1px solid #D4D4D4;
     display: inline-block;
     text-transform: uppercase;
     font-weight: 700;
@@ -33,32 +31,39 @@
     white-space: nowrap;
 }
 
-/* Base styles for all status badges */
 .badge {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    padding: 0.1rem 0.75rem;
-    border-radius: 9999px; /* rounded-full */
+    gap: 0.35rem;
+    padding: 0.15rem 0.65rem;
+    border-radius: 9999px;
     font-weight: 500;
-    font-size: 0.75rem; /* text-xs */
-    text-align: center;
+    font-size: 0.72rem;
+    line-height: 1.1rem;
+    border: 1px solid transparent;
+    white-space: nowrap;
 }
 
-/* Modifier class for Success (Valid, Taxed) */
 .badgeSuccess {
-    background-color: var(--success);
-    color: var(--success-foreground);
+    background-color: color-mix(in oklch, var(--success) 14%, transparent);
+    color: var(--success);
+    border-color: color-mix(in oklch, var(--success) 35%, transparent);
 }
 
 .badgeDestructive {
-    background-color: var(--destructive);
-    color: var(--destructive-foreground);
+    background-color: color-mix(in oklch, var(--destructive) 14%, transparent);
+    color: var(--destructive);
+    border-color: color-mix(in oklch, var(--destructive) 35%, transparent);
 }
 
-/* Secondary/neutral badge for "No details" and other states */
+.badgeWarning {
+    background-color: color-mix(in oklch, var(--warning) 18%, transparent);
+    color: color-mix(in oklch, var(--warning) 80%, var(--foreground));
+    border-color: color-mix(in oklch, var(--warning) 40%, transparent);
+}
+
 .badgeSecondary {
     background-color: transparent;
     color: var(--muted-foreground);
-    border: 1px solid var(--border);
+    border-color: var(--border);
 }
