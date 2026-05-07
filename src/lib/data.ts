@@ -19,6 +19,23 @@ const hourlyDetectionsQuery = `
     ORDER BY h.hour;
 `;
 
+const dailyDetectionsQuery = `
+    WITH days AS (
+      SELECT generate_series(
+        (current_date - interval '364 days')::date,
+        current_date::date,
+        '1 day'
+      )::date AS day
+    )
+    SELECT
+      TO_CHAR(d.day, 'YYYY-MM-DD') AS day,
+      COALESCE(COUNT(lp.id), 0)::int AS count
+    FROM days d
+    LEFT JOIN license_plates lp ON (lp.recent_capture_time AT TIME ZONE 'UTC')::date = d.day
+    GROUP BY d.day
+    ORDER BY d.day;
+`;
+
 export async function getAdminStats() {
     const client = await pool.connect();
     try {
@@ -29,6 +46,7 @@ export async function getAdminStats() {
             mostCommonMakeResult,
             mostCommonColorResult,
             detectionsByHourResult,
+            detectionsByDayResult,
         ] = await Promise.all([
             client.query('SELECT COUNT(*) FROM license_plates'),
             client.query('SELECT COUNT(DISTINCT plate_number) FROM license_plates'),
@@ -36,6 +54,7 @@ export async function getAdminStats() {
             client.query("SELECT car_make, COUNT(*) as count FROM license_plates WHERE car_make IS NOT NULL GROUP BY car_make ORDER BY count DESC LIMIT 1"),
             client.query("SELECT car_color, COUNT(*) as count FROM license_plates WHERE car_color IS NOT NULL GROUP BY car_color ORDER BY count DESC LIMIT 1"),
             client.query(hourlyDetectionsQuery),
+            client.query(dailyDetectionsQuery),
         ]);
 
         const stats = {
@@ -45,6 +64,7 @@ export async function getAdminStats() {
             mostCommonMake: mostCommonMakeResult.rows[0] ? `${mostCommonMakeResult.rows[0].car_make} (${mostCommonMakeResult.rows[0].count})` : 'N/A',
             mostCommonColor: mostCommonColorResult.rows[0] ? `${mostCommonColorResult.rows[0].car_color} (${mostCommonColorResult.rows[0].count})` : 'N/A',
             detectionsByHour: detectionsByHourResult.rows.map(r => ({ hour: r.hour, count: r.count })),
+            detectionsByDay: detectionsByDayResult.rows.map(r => ({ day: r.day, count: r.count })),
         };
 
         return stats;
