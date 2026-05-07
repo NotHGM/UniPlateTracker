@@ -46,6 +46,9 @@ pnpm-debug.log*
 .vscode/*
 !/.vscode/settings.json
 !/.vscode/extensions.json
+# Claude Code (local agent state)
+.claude/
+CLAUDE.md
 
 # --- OS & Miscellaneous ---
 # macOS
