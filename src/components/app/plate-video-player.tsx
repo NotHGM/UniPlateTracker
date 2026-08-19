@@ -35,7 +35,7 @@ export function PlateVideoPlayer({ videoUrl, plateNumber, appRegion }: PlateVide
     if (thumbnailFailed) {
         return (
             <div
-                className="w-28 aspect-video rounded-md bg-muted border border-dashed flex flex-col items-center justify-center gap-0.5 text-muted-foreground"
+                className="w-20 aspect-video rounded bg-muted border border-dashed flex flex-col items-center justify-center gap-0.5 text-muted-foreground"
                 title={`No clip was recorded for ${plateNumber}`}
             >
                 <FileVideo2 className="h-4 w-4" aria-hidden />
@@ -48,14 +48,14 @@ export function PlateVideoPlayer({ videoUrl, plateNumber, appRegion }: PlateVide
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
                 <button
-                    className="w-28 aspect-video rounded-md overflow-hidden bg-muted border relative group cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                    className="w-20 aspect-video rounded overflow-hidden bg-muted border relative group cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                     aria-label={`Play capture video for ${plateNumber}`}
                 >
                     <Image
                         src={thumbnailSrc}
                         alt=""
                         fill
-                        sizes="112px"
+                        sizes="80px"
                         unoptimized
                         onError={() => setThumbnailFailed(true)}
                         className="object-cover transition-transform group-hover:scale-105"

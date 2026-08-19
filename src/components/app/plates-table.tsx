@@ -213,7 +213,7 @@ export function PlatesTable({
                         placeholder="Search for a license plate..."
                         value={filters.search}
                         onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
-                        className="pl-9 h-10 text-base"
+                        className="pl-9 h-9"
                     />
                     {filters.search && (
                         <button
@@ -298,34 +298,50 @@ export function PlatesTable({
             </div>
 
             <div className="hidden md:block rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden">
-                <Table>
-                    <TableHeader>
+                {/*
+                  * The table body scrolls inside its own viewport rather than
+                  * with the page, which is what makes the pinned header work.
+                  *
+                  * Setting overflow on one axis forces the other to auto, so
+                  * the horizontal-scroll wrapper this component already had was
+                  * silently becoming the sticky containing block. Because that
+                  * wrapper never scrolled vertically, a header stuck to it
+                  * never engaged and simply scrolled away with the page.
+                  *
+                  * Giving the wrapper a bounded height and both axes makes it a
+                  * real scroll container, so top-0 pins against something that
+                  * actually moves. It also keeps the filter bar on screen while
+                  * paging through rows, which is the behaviour you want when
+                  * narrowing 4,279 detections.
+                  */}
+                <Table containerClassName="max-h-[calc(100vh-15rem)] overflow-auto">
+                    <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_var(--border)]">
                         <TableRow>
-                            <TableHead className="w-[120px] pl-6">Image</TableHead>
+                            <TableHead className="w-[104px] pl-4">Image</TableHead>
                             <TableHead>Plate</TableHead>
                             {showVehicleDetails && <TableHead>Vehicle</TableHead>}
                             {showVehicleDetails && <TableHead>MOT</TableHead>}
                             {showVehicleDetails && <TableHead>Tax</TableHead>}
                             {showVehicleDetails && <TableHead>Registration</TableHead>}
-                            {videoCaptureEnabled && <TableHead className="w-[120px]">Video</TableHead>}
-                            <TableHead className="text-left pr-6">Last seen</TableHead>
+                            {videoCaptureEnabled && <TableHead className="w-[104px]">Video</TableHead>}
+                            <TableHead className="text-left pr-4">Last seen</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        <AnimatePresence>
-                            {plates.length > 0 ? (
-                                plates.map((plate) => (
-                                    <motion.tr
-                                        key={plate.id}
-                                        layoutId={`plate-${plate.id}`}
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        exit={{ opacity: 0 }}
-                                        transition={{ duration: 0.25, ease: "easeOut" }}
-                                        className="hover:bg-muted/40 transition-colors"
-                                    >
-                                        <TableCell className="pl-6 py-2">
-                                            <div className="w-28 aspect-video rounded-md overflow-hidden bg-muted border">
+                        {/*
+                          * Rows are not animated. A monitoring table refreshes
+                          * on its own and can hold hundreds of rows, so a
+                          * per-row enter and exit means the list is in motion
+                          * whenever new detections arrive — which is exactly
+                          * when someone is trying to read it. Animating a
+                          * high-frequency list costs legibility and layout
+                          * work and buys nothing.
+                          */}
+                        {plates.length > 0 ? (
+                            plates.map((plate) => (
+                                    <TableRow key={plate.id}>
+                                        <TableCell className="pl-4 py-1.5">
+                                            <div className="w-20 aspect-video rounded overflow-hidden bg-muted border">
                                                 {plate.image_url ? (
                                                     <img
                                                         src={plate.image_url}
@@ -385,19 +401,23 @@ export function PlatesTable({
                                                         appRegion={appRegion}
                                                     />
                                                 ) : (
-                                                    <div className="w-28 aspect-video bg-muted border rounded-md flex items-center justify-center text-muted-foreground">
-                                                        <VideoOff className="w-4 h-4" />
+                                                    <div className="w-20 aspect-video bg-muted border rounded flex items-center justify-center text-muted-foreground">
+                                                        <VideoOff className="w-4 h-4" aria-hidden />
+                                                        <span className="sr-only">No clip expected</span>
                                                     </div>
                                                 )}
                                             </TableCell>
                                         )}
-                                        <TableCell className="text-left align-middle pr-6">
-                                            <div className="font-semibold">{dayjs(plate.recent_capture_time).fromNow()}</div>
-                                            <div className="text-xs text-muted-foreground">
+                                        <TableCell className="text-left align-middle pr-4">
+                                            <div className="font-medium">{dayjs(plate.recent_capture_time).fromNow()}</div>
+                                            <time
+                                                dateTime={dayjs(plate.recent_capture_time).toISOString()}
+                                                className="text-xs text-muted-foreground"
+                                            >
                                                 {dayjs(plate.recent_capture_time).format("DD/MM/YY HH:mm")}
-                                            </div>
+                                            </time>
                                         </TableCell>
-                                    </motion.tr>
+                                    </TableRow>
                                 ))
                             ) : (
                                 <TableRow>
@@ -409,7 +429,6 @@ export function PlatesTable({
                                     </TableCell>
                                 </TableRow>
                             )}
-                        </AnimatePresence>
                     </TableBody>
                 </Table>
             </div>
