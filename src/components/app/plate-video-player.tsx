@@ -4,15 +4,28 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { FileVideo2, PlayCircle } from "lucide-react";
 import Image from "next/image";
+import { cn } from "@/lib/utils";
 import { PlateTag } from "./plate-format";
 
 interface PlateVideoPlayerProps {
     videoUrl: string;
     plateNumber: string;
     appRegion: "UK" | "INTERNATIONAL";
+    /**
+     * Tile width. Has to be settable because the row's height is set by its
+     * tallest cell, so leaving this fixed while the capture thumbnail shrinks
+     * means compact density does nothing at all — measured at 62px in both
+     * modes before this was threaded through.
+     */
+    tileClassName?: string;
 }
 
-export function PlateVideoPlayer({ videoUrl, plateNumber, appRegion }: PlateVideoPlayerProps) {
+export function PlateVideoPlayer({
+    videoUrl,
+    plateNumber,
+    appRegion,
+    tileClassName = "w-20",
+}: PlateVideoPlayerProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [thumbnailFailed, setThumbnailFailed] = useState(false);
     const videoSrc = `/api/videos/${videoUrl}`;
@@ -35,7 +48,10 @@ export function PlateVideoPlayer({ videoUrl, plateNumber, appRegion }: PlateVide
     if (thumbnailFailed) {
         return (
             <div
-                className="w-20 aspect-video rounded bg-muted border border-dashed flex flex-col items-center justify-center gap-0.5 text-muted-foreground"
+                className={cn(
+                    tileClassName,
+                    "aspect-video rounded bg-muted border border-dashed flex flex-col items-center justify-center gap-0.5 text-muted-foreground",
+                )}
                 title={`No clip was recorded for ${plateNumber}`}
             >
                 <FileVideo2 className="h-4 w-4" aria-hidden />
@@ -48,7 +64,11 @@ export function PlateVideoPlayer({ videoUrl, plateNumber, appRegion }: PlateVide
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
                 <button
-                    className="w-20 aspect-video rounded overflow-hidden bg-muted border relative group cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                    className={cn(
+                        tileClassName,
+                        "aspect-video rounded overflow-hidden bg-muted border relative group cursor-pointer",
+                        "focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                    )}
                     aria-label={`Play capture video for ${plateNumber}`}
                 >
                     <Image

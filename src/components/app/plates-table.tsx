@@ -20,6 +20,8 @@ import { PlateVideoPlayer } from "./plate-video-player";
 import { PlateCard } from "./plate-card";
 import { PlateLink, StatusBadge } from "./plate-format";
 import { PlateImage } from "./plate-image";
+import { TableSettings } from "./table-settings";
+import { useTablePreferences, type ColumnKey } from "./use-table-preferences";
 
 dayjs.extend(relativeTime);
 
@@ -304,6 +306,31 @@ export function PlatesTable({
         [filterOptions],
     );
 
+    const { preferences, update, toggleColumn, isVisible } = useTablePreferences();
+
+    /*
+     * Only offer toggles for columns this configuration actually renders. In
+     * international mode without an API there are no vehicle details at all,
+     * and a menu listing columns that do not exist would be nonsense.
+     */
+    const availableColumns = useMemo(() => {
+        const columns: ColumnKey[] = ["image"];
+        if (showVehicleDetails) columns.push("vehicle", "mot", "tax", "registration");
+        if (videoCaptureEnabled) columns.push("video");
+        return columns;
+    }, [showVehicleDetails, videoCaptureEnabled]);
+
+    const isCompact = preferences.density === "compact";
+    const show = (column: ColumnKey) => availableColumns.includes(column) && isVisible(column);
+
+    /*
+     * colSpan for the empty state has to be counted rather than assumed. It was
+     * previously a nested ternary over two flags; with hideable columns that
+     * would drift out of step the first time anyone toggled one, and an empty
+     * state that spans the wrong width looks broken.
+     */
+    const visibleColumnCount = 2 + availableColumns.filter((column) => isVisible(column)).length;
+
     if (error) {
         return (
             <Alert variant="destructive">
@@ -362,6 +389,13 @@ export function PlatesTable({
                                     : `${formatNumber(pagination.totalRows)} results`}
                             </div>
                             <div className="flex items-center gap-2">
+                                <TableSettings
+                                    density={preferences.density}
+                                    onDensityChange={(density) => update({ density })}
+                                    hiddenColumns={preferences.hiddenColumns}
+                                    onToggleColumn={toggleColumn}
+                                    availableColumns={availableColumns}
+                                />
                                 {/*
                                   * Exports the whole matching set, not the page
                                   * on screen, so it carries the same query the
@@ -451,21 +485,21 @@ export function PlatesTable({
                 <Table containerClassName="max-h-[calc(100vh-15rem)] overflow-auto">
                     <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_var(--border)]">
                         <TableRow>
-                            <TableHead className="w-[104px] pl-4">Image</TableHead>
+                            {show("image") && <TableHead className="w-[104px] pl-4">Image</TableHead>}
                             <SortableHead label="Plate" sortKey="plate" activeSort={activeSort} activeDir={activeDir} onSort={handleSort} />
-                            {showVehicleDetails && (
+                            {show("vehicle") && (
                                 <SortableHead label="Vehicle" sortKey="make" activeSort={activeSort} activeDir={activeDir} onSort={handleSort} />
                             )}
-                            {showVehicleDetails && (
+                            {show("mot") && (
                                 <SortableHead label="MOT" sortKey="mot" activeSort={activeSort} activeDir={activeDir} onSort={handleSort} />
                             )}
-                            {showVehicleDetails && (
+                            {show("tax") && (
                                 <SortableHead label="Tax" sortKey="tax" activeSort={activeSort} activeDir={activeDir} onSort={handleSort} />
                             )}
-                            {showVehicleDetails && (
+                            {show("registration") && (
                                 <SortableHead label="Registration" sortKey="year" activeSort={activeSort} activeDir={activeDir} onSort={handleSort} />
                             )}
-                            {videoCaptureEnabled && <TableHead className="w-[104px]">Video</TableHead>}
+                            {show("video") && <TableHead className="w-[104px]">Video</TableHead>}
                             <SortableHead label="Last seen" sortKey="seen" activeSort={activeSort} activeDir={activeDir} onSort={handleSort} className="pr-4" />
                         </TableRow>
                     </TableHeader>
@@ -482,62 +516,85 @@ export function PlatesTable({
                         {plates.length > 0 ? (
                             plates.map((plate) => (
                                     <TableRow key={plate.id}>
-                                        <TableCell className="pl-4 py-1.5">
-                                            <PlateImage
-                                                imageUrl={plate.image_url}
-                                                plateNumber={plate.plate_number}
-                                                appRegion={appRegion}
-                                                capturedAt={plate.recent_capture_time}
-                                                className="w-20"
-                                            />
-                                        </TableCell>
+                                        {show("image") && (
+                                            <TableCell className={cn("pl-4", isCompact ? "py-1" : "py-1.5")}>
+                                                <PlateImage
+                                                    imageUrl={plate.image_url}
+                                                    plateNumber={plate.plate_number}
+                                                    appRegion={appRegion}
+                                                    capturedAt={plate.recent_capture_time}
+                                                    className={isCompact ? "w-12" : "w-20"}
+                                                />
+                                            </TableCell>
+                                        )}
                                         <TableCell className="align-middle">
                                             <PlateLink plateNumber={plate.plate_number} appRegion={appRegion} />
                                         </TableCell>
-                                        {showVehicleDetails && (
-                                            <>
-                                                <TableCell className="align-middle">
-                                                    <div className="font-semibold">{plate.car_make || "N/A"}</div>
+                                        {show("vehicle") && (
+                                            <TableCell className="align-middle">
+                                                <div className="font-semibold">{plate.car_make || "N/A"}</div>
+                                                {/*
+                                                  * Compact drops the secondary
+                                                  * line rather than shrinking
+                                                  * it. Halving a row's height
+                                                  * while keeping two lines of
+                                                  * text just makes both of them
+                                                  * cramped; choosing what to
+                                                  * omit is the actual work.
+                                                  */}
+                                                {!isCompact && (
                                                     <div className="text-sm text-muted-foreground">
                                                         {plate.car_color || "N/A"} • {plate.fuel_type || "N/A"}
                                                     </div>
-                                                </TableCell>
-                                                <TableCell className="align-middle">
-                                                    <StatusBadge status={plate.mot_status} />
-                                                    {plate.mot_expiry_date && (
-                                                        <div className="text-xs text-muted-foreground mt-1">
-                                                            Expires {dayjs(plate.mot_expiry_date).format("DD/MM/YYYY")}
-                                                        </div>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="align-middle">
-                                                    <StatusBadge status={plate.tax_status} />
-                                                    {plate.tax_due_date && (
-                                                        <div className="text-xs text-muted-foreground mt-1">
-                                                            Due {dayjs(plate.tax_due_date).format("DD/MM/YYYY")}
-                                                        </div>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="align-middle">
-                                                    <div className="font-semibold">{plate.year_of_manufacture || "N/A"}</div>
+                                                )}
+                                            </TableCell>
+                                        )}
+                                        {show("mot") && (
+                                            <TableCell className="align-middle">
+                                                <StatusBadge status={plate.mot_status} />
+                                                {!isCompact && plate.mot_expiry_date && (
+                                                    <div className="text-xs text-muted-foreground mt-1">
+                                                        Expires {dayjs(plate.mot_expiry_date).format("DD/MM/YYYY")}
+                                                    </div>
+                                                )}
+                                            </TableCell>
+                                        )}
+                                        {show("tax") && (
+                                            <TableCell className="align-middle">
+                                                <StatusBadge status={plate.tax_status} />
+                                                {!isCompact && plate.tax_due_date && (
+                                                    <div className="text-xs text-muted-foreground mt-1">
+                                                        Due {dayjs(plate.tax_due_date).format("DD/MM/YYYY")}
+                                                    </div>
+                                                )}
+                                            </TableCell>
+                                        )}
+                                        {show("registration") && (
+                                            <TableCell className="align-middle">
+                                                <div className="font-semibold">{plate.year_of_manufacture || "N/A"}</div>
+                                                {!isCompact && (
                                                     <div className="text-sm text-muted-foreground">
                                                         {plate.month_of_first_registration
                                                             ? `Reg: ${dayjs(plate.month_of_first_registration).format("MMM YYYY")}`
                                                             : "N/A"}
                                                     </div>
-                                                </TableCell>
-                                            </>
+                                                )}
+                                            </TableCell>
                                         )}
-                                        {videoCaptureEnabled && (
+                                        {show("video") && (
                                             <TableCell className="align-middle">
                                                 {plate.video_url ? (
                                                     <PlateVideoPlayer
                                                         videoUrl={plate.video_url}
                                                         plateNumber={plate.plate_number}
                                                         appRegion={appRegion}
+                                                        tileClassName={isCompact ? "w-12" : "w-20"}
                                                     />
                                                 ) : (
-                                                    <div className="w-20 aspect-video bg-muted border rounded flex items-center justify-center text-muted-foreground">
+                                                    <div className={cn(
+                                                        isCompact ? "w-12" : "w-20",
+                                                        "aspect-video bg-muted border rounded flex items-center justify-center text-muted-foreground",
+                                                    )}>
                                                         <VideoOff className="w-4 h-4" aria-hidden />
                                                         <span className="sr-only">No clip expected</span>
                                                     </div>
@@ -546,19 +603,21 @@ export function PlatesTable({
                                         )}
                                         <TableCell className="text-left align-middle pr-4">
                                             <div className="font-medium">{dayjs(plate.recent_capture_time).fromNow()}</div>
-                                            <time
-                                                dateTime={dayjs(plate.recent_capture_time).toISOString()}
-                                                className="text-xs text-muted-foreground"
-                                            >
-                                                {dayjs(plate.recent_capture_time).format("DD/MM/YY HH:mm")}
-                                            </time>
+                                            {!isCompact && (
+                                                <time
+                                                    dateTime={dayjs(plate.recent_capture_time).toISOString()}
+                                                    className="text-xs text-muted-foreground"
+                                                >
+                                                    {dayjs(plate.recent_capture_time).format("DD/MM/YY HH:mm")}
+                                                </time>
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                 ))
                             ) : (
                                 <TableRow>
                                     <TableCell
-                                        colSpan={showVehicleDetails ? (videoCaptureEnabled ? 8 : 7) : (videoCaptureEnabled ? 4 : 3)}
+                                        colSpan={visibleColumnCount}
                                         className="py-10"
                                     >
                                         <EmptyState
