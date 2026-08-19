@@ -3,16 +3,17 @@ import { NextResponse, NextRequest } from 'next/server';
 import pool from '@/lib/db';
 import { z } from 'zod';
 import type { PoolClient } from 'pg';
+import { FilterSchema, buildPlateQuery } from '@/lib/plate-filters';
 
-const QuerySchema = z.object({
+/*
+ * Filtering and sorting live in lib/plate-filters so that this route and the
+ * CSV export apply identical rules. An export that quietly filters differently
+ * from the table it was launched from produces a file that looks right and is
+ * wrong.
+ */
+const QuerySchema = FilterSchema.extend({
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(10),
-    search: z.string().optional(),
-    make: z.string().optional(),
-    color: z.string().optional(),
-    year: z.coerce.number().int().optional(),
-    tax: z.string().optional(),
-    mot: z.string().optional(),
 });
 
 export async function GET(request: NextRequest) {
@@ -23,37 +24,17 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid query parameters' }, { status: 400 });
     }
 
-    const { page, limit, search, make, color, year, tax, mot } = validation.data;
+    const { page, limit, ...filters } = validation.data;
     const offset = (page - 1) * limit;
 
-    const conditions: string[] = [];
-    const queryParams: (string | number)[] = [];
+    const { whereClause, params: queryParams, orderBy } = buildPlateQuery(filters);
 
-    const addCondition = (field: string, value: string | number | undefined, operator = "=") => {
-        if (value !== undefined && value !== null && value !== '' && value !== 'all') {
-            queryParams.push(operator === 'ILIKE' ? `%${value}%` : value);
-            conditions.push(`${field} ${operator} $${queryParams.length}`);
-        }
-    };
-
-    if (search) {
-        queryParams.push(`%${search.toUpperCase().replace(/\s/g, '')}%`);
-        conditions.push(`UPPER(REPLACE(plate_number, ' ', '')) ILIKE $${queryParams.length}`);
-    }
-
-    addCondition('car_make', make);
-    addCondition('car_color', color);
-    addCondition('year_of_manufacture', year);
-    addCondition('tax_status', tax);
-    addCondition('mot_status', mot);
-
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
     let client: PoolClient | null = null;
     try {
         const dbClient: PoolClient = await pool.connect();
         client = dbClient;
 
-        const dataQuery = `SELECT * FROM license_plates ${whereClause} ORDER BY recent_capture_time DESC LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
+        const dataQuery = `SELECT * FROM license_plates ${whereClause} ${orderBy} LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
         const dataResult = await dbClient.query(dataQuery, [...queryParams, limit, offset]);
 
         const countQuery = `SELECT COUNT(*) FROM license_plates ${whereClause}`;

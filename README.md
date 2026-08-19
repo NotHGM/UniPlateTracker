@@ -13,18 +13,26 @@ Events are received in real-time from your UniFi NVR via webhooks. The applicati
 -   **Secure Admin Dashboard:** A protected admin area with charts, usage statistics, and user management.
 -   **Hierarchical Admin Accounts:** The initial admin can securely add or revoke access for other administrators.
 -   **Full Audit Trail:** All administrative actions (adding/revoking users) are logged for the initial admin to review.
--   **Modern Web Interface:** A fast and responsive dashboard with dynamic filters, search, and automatic live updates.
+-   **Built for Scanning:** A dense, sortable detections table designed for reading quickly rather than for looking impressive. Sorting and filtering run in the database, so ordering applies to the whole result set and not just the page you happen to be on.
+-   **Status That Marks the Exception:** Most vehicles are taxed with a valid MOT, so those stay visually quiet. Only expired, untaxed and SORN vehicles are highlighted, and "no DVLA record" is shown distinctly so missing information never reads as a clean result.
+-   **Works on a Phone:** The table reflows into a card list on narrow screens, so every column stays reachable rather than being cut off.
+-   **Accessible:** Labelled controls throughout, keyboard-operable sorting and paging, `aria-sort` on the table, and `prefers-reduced-motion` respected. Audited with zero violations.
 -   **Light & Dark Mode:** Adapts to your system preferences for comfortable viewing.
 
 ## 🛠️ Tech Stack
 
--   **Framework:** Next.js (App Router)
+-   **Framework:** Next.js 16 (App Router)
 -   **Language:** TypeScript
 -   **Video Processing:** FFmpeg
 -   **Backend:** Next.js API Routes & a standalone Node.js Worker/Buffer Manager
 -   **Database:** PostgreSQL
--   **UI:** React, Tailwind CSS, shadcn/ui
+-   **UI:** React 19, Tailwind CSS v4, shadcn/ui
 -   **API Integration:** UniFi Protect Webhooks, DVLA API
+
+> **Note on styling:** Tailwind v4 takes its theme from CSS rather than from a
+> JavaScript config, so there is no `tailwind.config.ts`. All design tokens —
+> colours, radii, the plate and status styles — live in the `@theme` block in
+> `src/app/globals.css`. That file is the single place to change the look.
 
 ---
 
@@ -201,3 +209,51 @@ Your UniPlateTracker instance is now running!
 *   **Webhook Endpoint:** `http://<your_server_ip>:4000`
 *   **View Logs:** `docker compose logs -f`
 *   **Stop Application:** `docker compose down`
+
+---
+
+## 🔧 Troubleshooting
+
+### Detections show "No clip" in the Video column
+
+The detection was recorded, but no video file exists for it on disk. Plate
+detection and video capture are separate paths — the webhook writes the row,
+and the worker records the clip from the camera's RTSP stream — so capture can
+fail while detections carry on arriving normally. That makes this failure easy
+to miss, which is why the UI labels it rather than showing a broken image.
+
+Note the difference between the two empty states: a **dashed "No clip"** tile
+means a clip was expected and is missing, while a **plain camera icon** means
+the detection never referenced one.
+
+Check, in order:
+
+1.  **Is anything being written?** `ls -lt` the directory in
+    `VIDEO_FINAL_CAPTURE_PATH` and look at the newest file's date. If it
+    stopped on a particular day, something changed that day.
+2.  **Is FFmpeg still present and working?** `ffmpeg -version`. A system
+    upgrade can remove it or change its path.
+3.  **Are the camera credentials still valid?** An expired UniFi Protect
+    password or a rotated RTSP URL stops capture while leaving webhooks intact,
+    because the NVR pushes those and does not need the app to authenticate.
+4.  **Are both background processes alive?** The worker and the buffer manager
+    are separate processes. `pm2 list` should show both, or
+    `docker compose logs -f` for Docker. A crashed buffer manager stops clips
+    without stopping detections.
+5.  **Can the app read the directory?** It must be readable by the user running
+    the app, which is not necessarily the user that created it.
+
+### Video and thumbnails return 404
+
+The API only serves files whose names contain letters, digits, dots, hyphens
+and underscores, and only `.mp4` and `.jpg` extensions. It also refuses any
+path that changes when normalised, so directory traversal fails rather than
+escaping the capture directory. If a legitimate file 404s, check its name for
+characters outside that set.
+
+### Vehicle details show "Unknown"
+
+The DVLA holds no record for that registration, or the lookup failed. This is
+shown as a hollow, dashed chip rather than as a status, because it means the
+information is absent rather than that the vehicle is compliant. Non-UK plates
+will always show this unless `ENABLE_INTERNATIONAL_API` is configured.

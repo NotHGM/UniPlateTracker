@@ -16,6 +16,11 @@ out/
 # TypeScript build info cache
 *.tsbuildinfo
 
+# Next.js regenerates this on every dev start and every build, and it points
+# at a different path in each mode, so tracking it produces a diff whenever
+# anyone switches between the two.
+next-env.d.ts
+
 # Our worker's compiled JavaScript output
 dist/
 
@@ -31,9 +36,11 @@ pnpm-debug.log*
 
 # --- Environment Variables (CRITICAL FOR SECURITY) ---
 # NEVER commit files with secrets.
-# Ignore all local environment files.
-.env.local
-.env.*.local
+# Ignore every environment file, not just the .local variants. A plain .env
+# holds exactly the same database credentials and DVLA API key, and was
+# previously not covered here at all.
+.env
+.env.*
 
 # An exception to the rule above: ALWAYS commit an example file.
 # This tells other developers what variables are needed for the project.
@@ -46,9 +53,12 @@ pnpm-debug.log*
 .vscode/*
 !/.vscode/settings.json
 !/.vscode/extensions.json
-# Claude Code (local agent state)
+# Agent instruction files. Next 16 regenerates both of these on every dev
+# start and build (see agentRules in next.config), so they are build output
+# rather than source.
 .claude/
 CLAUDE.md
+AGENTS.md
 
 # --- OS & Miscellaneous ---
 # macOS

@@ -1,0 +1,35 @@
+# ==================================
+# UniPlateTracker .gitattributes
+# ==================================
+#
+# Normalise line endings on the way into the repository and check everything
+# back out as LF, regardless of the contributor's platform or their global
+# core.autocrlf setting. Without this, a clone on a machine configured for
+# CRLF reports every tracked file as modified and produces commits that
+# change thousands of lines without changing any behaviour.
+
+* text=auto eol=lf
+
+# --- Files that must stay LF ---
+# Shell scripts are executed on Linux hosts and in the Docker image. A CRLF
+# line ending here breaks the shebang and the script fails to start.
+*.sh            text eol=lf
+Dockerfile      text eol=lf
+*.yml           text eol=lf
+
+# --- Binary assets ---
+# Never line-ending-normalised, never diffed as text.
+*.woff2         binary
+*.woff          binary
+*.ico           binary
+*.png           binary
+*.jpg           binary
+*.jpeg          binary
+*.webp          binary
+*.mp4           binary
+
+# --- Generated files ---
+# Lockfiles are machine-written. Marking them keeps them out of language
+# statistics and out of the way during review.
+package-lock.json       text eol=lf linguist-generated=true
+worker/package-lock.json text eol=lf linguist-generated=true

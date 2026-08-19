@@ -34,18 +34,44 @@
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
 
+  --color-status-ok: var(--status-ok);
+  --color-status-alert: var(--status-alert);
+  --color-status-warn: var(--status-warn);
+  --color-status-unknown: var(--status-unknown);
+
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
   --font-plate: var(--font-plate);
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 6px);
+}
+
+/*
+ * Physical constants of a UK registration plate.
+ *
+ * These sit outside the light/dark token sets on purpose. A number plate is a
+ * real object with a legally defined appearance — BS AU 145e fixes the yellow
+ * rear face and the black characters — so it does not restyle itself when the
+ * operator switches to dark mode any more than it would in the street. The
+ * previous #FBBF24 was Tailwind's amber-400 standing in for it, which reads
+ * noticeably orange next to the real thing.
+ */
+:root,
+.dark {
+  --plate-uk-face: oklch(0.86 0.17 92);
+  --plate-uk-ink: oklch(0.15 0 0);
+  --plate-uk-edge: oklch(0.62 0.05 92);
+
+  --plate-intl-face: oklch(0.99 0 0);
+  --plate-intl-ink: oklch(0.25 0.08 264);
+  --plate-intl-edge: oklch(0.82 0.01 264);
 }
 
 :root {
-  --radius: 0.625rem;
+  --radius: 0.5rem;
 
   --background: oklch(1 0 0);
   --foreground: oklch(0.18 0.012 264);
@@ -79,6 +105,26 @@
   --chart-3: oklch(0.55 0.14 150);
   --chart-4: oklch(0.74 0.16 75);
   --chart-5: oklch(0.62 0.21 25);
+
+  /*
+   * Detection status, which is a different job from the generic
+   * success/warning/destructive set above.
+   *
+   * Nearly every vehicle on a normal day is taxed with a valid MOT, so
+   * colouring those green made the unremarkable case the loudest thing on
+   * screen and left nothing for the eye to catch on. These tokens are used
+   * with that emphasis inverted: `ok` stays deliberately quiet and only
+   * `alert` and `warn` are allowed to shout, so a screen full of compliant
+   * vehicles reads as calm and the one SORN vehicle is visible immediately.
+   *
+   * `unknown` is separate from all of them because "the DVLA holds no record"
+   * is an absence of information, not a status, and must never be mistaken
+   * for a clean result.
+   */
+  --status-ok: oklch(0.52 0.09 155);
+  --status-alert: oklch(0.55 0.21 27);
+  --status-warn: oklch(0.65 0.16 62);
+  --status-unknown: oklch(0.55 0.015 257);
 }
 
 .dark {
@@ -114,6 +160,12 @@
   --chart-3: oklch(0.78 0.18 70);
   --chart-4: oklch(0.65 0.22 304);
   --chart-5: oklch(0.66 0.24 16);
+
+  /* Lifted for legibility against a dark surface; same roles as light. */
+  --status-ok: oklch(0.72 0.11 155);
+  --status-alert: oklch(0.7 0.19 27);
+  --status-warn: oklch(0.79 0.15 62);
+  --status-unknown: oklch(0.65 0.015 257);
 }
 
 @layer base {
@@ -124,6 +176,142 @@
     @apply bg-background text-foreground font-sans;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+  }
+
+  /*
+   * Proportional digits make a column of dates and years ragged, because a 1
+   * occupies less width than a 0 and nothing lines up vertically. Every
+   * number in this application sits in a column of other numbers, so tabular
+   * figures are the default rather than something to remember per component.
+   */
+  table,
+  time,
+  [data-numeric] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /*
+   * Respect the operating system setting. This is a monitoring surface that
+   * refreshes on its own, and someone who has asked for less motion should
+   * not have rows animating underneath them while they read.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer base {
+  /*
+   * Recharts marks its SVG surface tabindex="0", so the chart is a tab stop,
+   * but ships no focus style with it — a keyboard user tabs onto the chart and
+   * nothing on screen changes. Restored here rather than per chart, since it
+   * applies to every chart the library renders.
+   */
+  .recharts-surface:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+}
+
+@layer components {
+  /*
+   * A registration plate, rendered as the object rather than as a label.
+   *
+   * This is the one piece of the interface with genuine identity, so it is
+   * worth building properly: the real Charles Wright typeface, the legal
+   * yellow, and enough tracking that the characters sit the way they do on a
+   * physical plate rather than the way a browser would set them by default.
+   */
+  .plate {
+    display: inline-block;
+    padding: 0.15rem 0.55rem;
+    border-radius: 0.25rem;
+    border: 1px solid;
+    font-weight: 700;
+    font-size: 0.95rem;
+    line-height: 1.4;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .plate-uk {
+    font-family: var(--font-plate);
+    background-color: var(--plate-uk-face);
+    color: var(--plate-uk-ink);
+    border-color: var(--plate-uk-edge);
+  }
+
+  .plate-intl {
+    font-family: var(--font-sans);
+    background-color: var(--plate-intl-face);
+    color: var(--plate-intl-ink);
+    border-color: var(--plate-intl-edge);
+  }
+
+  /*
+   * Status chips.
+   *
+   * Only `alert` and `warn` get a filled surface. `ok` is a bare dot and
+   * plain text, because a taxed vehicle with a valid MOT is the expected
+   * case and does not deserve to compete for attention with a SORN one.
+   */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.1rem 0.45rem;
+    border-radius: 0.25rem;
+    border: 1px solid transparent;
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.15rem;
+    white-space: nowrap;
+  }
+
+  .chip::before {
+    content: "";
+    width: 0.4rem;
+    height: 0.4rem;
+    border-radius: 9999px;
+    background-color: currentColor;
+    flex-shrink: 0;
+  }
+
+  .chip-ok {
+    color: var(--status-ok);
+  }
+
+  .chip-alert {
+    color: var(--status-alert);
+    background-color: color-mix(in oklch, var(--status-alert) 12%, transparent);
+    border-color: color-mix(in oklch, var(--status-alert) 32%, transparent);
+  }
+
+  .chip-warn {
+    color: var(--status-warn);
+    background-color: color-mix(in oklch, var(--status-warn) 14%, transparent);
+    border-color: color-mix(in oklch, var(--status-warn) 34%, transparent);
+  }
+
+  /* Absent information: hollow, dashed, and never mistakable for a result. */
+  .chip-unknown {
+    color: var(--status-unknown);
+    border-color: color-mix(in oklch, var(--status-unknown) 40%, transparent);
+    border-style: dashed;
+  }
+
+  .chip-unknown::before {
+    background-color: transparent;
+    border: 1px dashed currentColor;
   }
 }
 

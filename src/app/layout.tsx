@@ -4,6 +4,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
+import { AppShell } from "@/components/shell/app-shell";
 
 const geistSans = Geist({
     variable: "--font-sans",
@@ -45,7 +46,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                     enableSystem
                     disableTransitionOnChange
                 >
-                    {children}
+                    <AppShell>{children}</AppShell>
                 </ThemeProvider>
             </body>
         </html>

@@ -1,7 +1,6 @@
 import { Suspense } from "react";
-import { ModeToggle } from "@/components/mode-toggle";
-import { AdminButton } from "@/components/admin-button";
 import { HomePageClient } from "@/components/app/home-page-client";
+import { PageHeader } from "@/components/shell/app-shell";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function DashboardSkeleton() {
@@ -19,28 +18,20 @@ export default function HomePage() {
     const videoCaptureEnabled = process.env.ENABLE_VIDEO_CAPTURE === "true";
 
     return (
-        <div className="bg-background min-h-screen">
-            <main className="container mx-auto p-4 sm:p-6 lg:p-8">
-                <div className="flex justify-between items-start gap-4 mb-6 flex-wrap">
-                    <div className="space-y-1">
-                        <h1 className="text-3xl font-bold tracking-tight text-foreground">UniPlateTracker</h1>
-                        <p className="text-muted-foreground">
-                            A centralized dashboard for license plate monitoring.
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <AdminButton />
-                        <ModeToggle />
-                    </div>
-                </div>
-                <Suspense fallback={<DashboardSkeleton />}>
-                    <HomePageClient
-                        appRegion={appRegion}
-                        internationalApiEnabled={internationalApiEnabled}
-                        videoCaptureEnabled={videoCaptureEnabled}
-                    />
-                </Suspense>
-            </main>
-        </div>
+        <>
+            {/*
+              * Deliberately does not claim an order. The table is sortable by
+              * six columns now, so "newest first" would be a lie the moment
+              * anyone touched a header.
+              */}
+            <PageHeader title="Detections" description="Every plate seen by your cameras." />
+            <Suspense fallback={<DashboardSkeleton />}>
+                <HomePageClient
+                    appRegion={appRegion}
+                    internationalApiEnabled={internationalApiEnabled}
+                    videoCaptureEnabled={videoCaptureEnabled}
+                />
+            </Suspense>
+        </>
     );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { PlatesApiResponse } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,15 +9,19 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
 import { DataPagination } from "./data-pagination";
 import { motion, AnimatePresence } from "framer-motion";
 import useSWR from "swr";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
-import styles from "./plates.module.css";
-import { ImageOff, RefreshCw, Search, VideoOff, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronsUpDown, Download, RefreshCw, Search, VideoOff, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { PlateVideoPlayer } from "./plate-video-player";
+import { PlateCard } from "./plate-card";
+import { PlateLink, StatusBadge } from "./plate-format";
+import { PlateImage } from "./plate-image";
+import { TableSettings } from "./table-settings";
+import { useTablePreferences, type ColumnKey } from "./use-table-preferences";
 
 dayjs.extend(relativeTime);
 
@@ -31,40 +35,148 @@ interface PlatesTableProps {
     videoCaptureEnabled: boolean;
 }
 
-const formatPlate = (plate: string | null): React.ReactNode => {
-    if (!plate) return <>{"N/A"}</>;
-    plate = plate.replace(/\s/g, "");
-    if (plate.length >= 7) {
-        return (
-            <>
-                <span>{plate.substring(0, 4)}</span>
-                <span style={{ display: "inline-block", width: "0.25em" }} />
-                <span>{plate.substring(4)}</span>
-            </>
-        );
-    }
-    if (plate.length === 6) {
-        return (
-            <>
-                <span>{plate.substring(0, 3)}</span>
-                <span style={{ display: "inline-block", width: "0.25em" }} />
-                <span>{plate.substring(3)}</span>
-            </>
-        );
-    }
-    return <span>{plate}</span>;
-};
-
-const getStatusClass = (status: string | null): string => {
-    if (!status) return styles.badgeSecondary;
-    const lower = status.toLowerCase();
-    if (lower === "valid" || lower === "taxed") return styles.badgeSuccess;
-    if (lower.includes("expire") || lower.includes("due") || lower.includes("not taxed")) return styles.badgeDestructive;
-    if (lower.includes("sorn") || lower.includes("untaxed")) return styles.badgeWarning;
-    return styles.badgeSecondary;
-};
-
 const formatNumber = (n: number) => new Intl.NumberFormat("en-GB").format(n);
+
+type SortKey = "seen" | "plate" | "make" | "year" | "mot" | "tax";
+type SortDir = "asc" | "desc";
+
+/**
+ * Two different nothings.
+ *
+ * An empty table previously said "No results found" regardless of cause, which
+ * conflates a fresh install with a dead-end filter combination. They call for
+ * opposite responses: one means wait for the cameras, the other means the way
+ * out is to widen the filters, so the way out is offered directly.
+ */
+function EmptyState({ hasFilters, onClear }: { hasFilters: boolean; onClear: () => void }) {
+    if (!hasFilters) {
+        return (
+            <div className="text-center space-y-1">
+                <p className="font-medium">No detections yet</p>
+                <p className="text-sm text-muted-foreground">
+                    Plates will appear here as your cameras report them.
+                </p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="text-center space-y-2">
+            <div className="space-y-1">
+                <p className="font-medium">No matching detections</p>
+                <p className="text-sm text-muted-foreground">
+                    No plate matches every filter you have applied.
+                </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={onClear}>
+                Clear filters
+            </Button>
+        </div>
+    );
+}
+
+/**
+ * A column header that sorts.
+ *
+ * Rendered as a real button inside the th rather than a click handler on the
+ * th itself, so it is reachable by keyboard and announced as an interactive
+ * control. aria-sort on the header cell is what tells a screen reader which
+ * column the table is currently ordered by, and in which direction — the
+ * arrow glyph alone communicates that to sighted users only.
+ */
+function SortableHead({
+    label,
+    sortKey,
+    activeSort,
+    activeDir,
+    onSort,
+    className,
+}: {
+    label: string;
+    sortKey: SortKey;
+    activeSort: SortKey;
+    activeDir: SortDir;
+    onSort: (key: SortKey) => void;
+    className?: string;
+}) {
+    const isActive = activeSort === sortKey;
+
+    return (
+        <TableHead
+            className={className}
+            aria-sort={isActive ? (activeDir === "asc" ? "ascending" : "descending") : "none"}
+        >
+            <button
+                type="button"
+                onClick={() => onSort(sortKey)}
+                className={cn(
+                    "inline-flex items-center gap-1 rounded-sm -mx-1 px-1 py-0.5 transition-colors",
+                    "hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                    isActive ? "text-foreground" : "text-muted-foreground",
+                )}
+            >
+                {label}
+                {isActive ? (
+                    activeDir === "asc" ? (
+                        <ArrowUp className="h-3 w-3" aria-hidden />
+                    ) : (
+                        <ArrowDown className="h-3 w-3" aria-hidden />
+                    )
+                ) : (
+                    <ChevronsUpDown className="h-3 w-3 opacity-40" aria-hidden />
+                )}
+            </button>
+        </TableHead>
+    );
+}
+
+type FilterKey = "make" | "color" | "year" | "mot" | "tax";
+
+/**
+ * A labelled filter dropdown.
+ *
+ * Radix renders its trigger as a button whose only content is the selected
+ * value, so a trigger showing "All makes" announces as an unnamed button —
+ * the control has no name at all until you already know what it filters.
+ *
+ * The name has to carry the visible text as well as the field, not replace
+ * it. WCAG 2.5.3 requires the accessible name to contain the visible label,
+ * so that someone using voice control can say what they can see: with a bare
+ * aria-label of "Filter by make", saying "click all makes" matches nothing.
+ * Composing the two gives "Filter by make: All makes", which satisfies both
+ * the screen reader and the voice user.
+ */
+function FilterSelect({
+    label,
+    anyLabel,
+    options,
+    value,
+    onChange,
+}: {
+    label: string;
+    anyLabel: string;
+    options: readonly string[];
+    value: string;
+    onChange: (value: string) => void;
+}) {
+    const visibleText = value && value !== "all" ? value : anyLabel;
+
+    return (
+        <Select value={value} onValueChange={onChange}>
+            <SelectTrigger className="w-full h-9" aria-label={`${label}: ${visibleText}`}>
+                <SelectValue placeholder={anyLabel} />
+            </SelectTrigger>
+            <SelectContent>
+                <SelectItem value="all">{anyLabel}</SelectItem>
+                {options.map((option) => (
+                    <SelectItem key={option} value={option}>
+                        {option}
+                    </SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
+    );
+}
 
 export function PlatesTable({
     initialApiData,
@@ -149,6 +261,25 @@ export function PlatesTable({
 
     const handleShowNewPlates = () => router.push(pathname);
 
+    const activeSort = (searchParams.get("sort") as SortKey) || "seen";
+    const activeDir = (searchParams.get("dir") as SortDir) || "desc";
+
+    /**
+     * Clicking the active column flips direction; clicking a new one starts
+     * descending, because for every column here the interesting end is the
+     * recent or the largest. Sorting always returns to page one — staying on
+     * page 12 of a freshly reordered set puts you somewhere arbitrary.
+     */
+    const handleSort = (key: SortKey) => {
+        const params = new URLSearchParams(searchParams.toString());
+        const nextDir: SortDir = activeSort === key && activeDir === "desc" ? "asc" : "desc";
+
+        params.set("sort", key);
+        params.set("dir", nextDir);
+        params.set("page", "1");
+        router.push(`${pathname}?${params.toString()}`, { scroll: false });
+    };
+
     const showVehicleDetails = appRegion === "UK" || internationalApiEnabled;
     const pagination = initialApiData?.pagination ?? { currentPage: 1, totalPages: 0, totalRows: 0 };
     const filterOptions = initialApiData?.filterOptions ?? { makes: [], colors: [], years: [], motStatuses: [], taxStatuses: [] };
@@ -157,6 +288,48 @@ export function PlatesTable({
     const activeFilterCount =
         Object.entries(filters).filter(([k, v]) => k !== "search" && v && v !== "all").length +
         (filters.search ? 1 : 0);
+
+    const filterFields = useMemo(
+        () =>
+            [
+                { key: "make", label: "Filter by make", anyLabel: "All makes", options: filterOptions.makes },
+                { key: "color", label: "Filter by colour", anyLabel: "All colors", options: filterOptions.colors },
+                {
+                    key: "year",
+                    label: "Filter by year of manufacture",
+                    anyLabel: "All years",
+                    options: filterOptions.years.map(String),
+                },
+                { key: "mot", label: "Filter by MOT status", anyLabel: "All MOT", options: filterOptions.motStatuses },
+                { key: "tax", label: "Filter by tax status", anyLabel: "All tax", options: filterOptions.taxStatuses },
+            ] satisfies readonly { key: FilterKey; label: string; anyLabel: string; options: readonly string[] }[],
+        [filterOptions],
+    );
+
+    const { preferences, update, toggleColumn, isVisible } = useTablePreferences();
+
+    /*
+     * Only offer toggles for columns this configuration actually renders. In
+     * international mode without an API there are no vehicle details at all,
+     * and a menu listing columns that do not exist would be nonsense.
+     */
+    const availableColumns = useMemo(() => {
+        const columns: ColumnKey[] = ["image"];
+        if (showVehicleDetails) columns.push("vehicle", "mot", "tax", "registration");
+        if (videoCaptureEnabled) columns.push("video");
+        return columns;
+    }, [showVehicleDetails, videoCaptureEnabled]);
+
+    const isCompact = preferences.density === "compact";
+    const show = (column: ColumnKey) => availableColumns.includes(column) && isVisible(column);
+
+    /*
+     * colSpan for the empty state has to be counted rather than assumed. It was
+     * previously a nested ternary over two flags; with hideable columns that
+     * would drift out of step the first time anyone toggled one, and an empty
+     * state that spans the wrong width looks broken.
+     */
+    const visibleColumnCount = 2 + availableColumns.filter((column) => isVisible(column)).length;
 
     if (error) {
         return (
@@ -171,12 +344,17 @@ export function PlatesTable({
         <div className="space-y-4">
             <Card className="p-4 sm:p-5 gap-4">
                 <div className="relative">
+                    <label htmlFor="plate-search" className="sr-only">
+                        Search license plates
+                    </label>
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden />
                     <Input
+                        id="plate-search"
+                        type="search"
                         placeholder="Search for a license plate..."
                         value={filters.search}
                         onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
-                        className="pl-9 h-10 text-base"
+                        className="pl-9 h-9"
                     />
                     {filters.search && (
                         <button
@@ -192,41 +370,16 @@ export function PlatesTable({
                 {showVehicleDetails && (
                     <>
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-                            <Select value={filters.make} onValueChange={(v) => setFilters((f) => ({ ...f, make: v }))}>
-                                <SelectTrigger className="w-full h-9"><SelectValue placeholder="All makes" /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All makes</SelectItem>
-                                    {filterOptions.makes.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                            <Select value={filters.color} onValueChange={(v) => setFilters((f) => ({ ...f, color: v }))}>
-                                <SelectTrigger className="w-full h-9"><SelectValue placeholder="All colors" /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All colors</SelectItem>
-                                    {filterOptions.colors.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                            <Select value={filters.year} onValueChange={(v) => setFilters((f) => ({ ...f, year: v }))}>
-                                <SelectTrigger className="w-full h-9"><SelectValue placeholder="All years" /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All years</SelectItem>
-                                    {filterOptions.years.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                            <Select value={filters.mot} onValueChange={(v) => setFilters((f) => ({ ...f, mot: v }))}>
-                                <SelectTrigger className="w-full h-9"><SelectValue placeholder="All MOT" /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All MOT</SelectItem>
-                                    {filterOptions.motStatuses.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                            <Select value={filters.tax} onValueChange={(v) => setFilters((f) => ({ ...f, tax: v }))}>
-                                <SelectTrigger className="w-full h-9"><SelectValue placeholder="All tax" /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All tax</SelectItem>
-                                    {filterOptions.taxStatuses.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
+                            {filterFields.map((field) => (
+                                <FilterSelect
+                                    key={field.key}
+                                    label={field.label}
+                                    anyLabel={field.anyLabel}
+                                    options={field.options}
+                                    value={filters[field.key]}
+                                    onChange={(v) => setFilters((f) => ({ ...f, [field.key]: v }))}
+                                />
+                            ))}
                         </div>
 
                         <div className="flex items-center justify-between gap-2">
@@ -236,6 +389,31 @@ export function PlatesTable({
                                     : `${formatNumber(pagination.totalRows)} results`}
                             </div>
                             <div className="flex items-center gap-2">
+                                <TableSettings
+                                    density={preferences.density}
+                                    onDensityChange={(density) => update({ density })}
+                                    hiddenColumns={preferences.hiddenColumns}
+                                    onToggleColumn={toggleColumn}
+                                    availableColumns={availableColumns}
+                                />
+                                {/*
+                                  * Exports the whole matching set, not the page
+                                  * on screen, so it carries the same query the
+                                  * table was built from. A plain link rather
+                                  * than a fetch, so the browser streams it
+                                  * straight to disk instead of buffering a
+                                  * potentially very large file in memory.
+                                  */}
+                                <Button variant="ghost" size="sm" asChild>
+                                    <a
+                                        href={`/api/plates/export?${searchParams.toString()}`}
+                                        download
+                                        title={`Download all ${formatNumber(pagination.totalRows)} matching detections as CSV`}
+                                    >
+                                        <Download className="h-4 w-4 mr-1.5" aria-hidden />
+                                        Export
+                                    </a>
+                                </Button>
                                 <Button onClick={handleClearFilters} variant="ghost" size="sm" disabled={activeFilterCount === 0}>
                                     Clear
                                 </Button>
@@ -263,125 +441,192 @@ export function PlatesTable({
                 )}
             </AnimatePresence>
 
-            <div className="rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden">
-                <Table>
-                    <TableHeader>
+            {/*
+              * Below md the table becomes a card list rather than a scrolling
+              * table. See plate-card.tsx for why reflowing beats scrolling here.
+              */}
+            <div className="md:hidden rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden">
+                {plates.length > 0 ? (
+                    <ul className="divide-y">
+                        {plates.map((plate) => (
+                            <PlateCard
+                                key={plate.id}
+                                plate={plate}
+                                appRegion={appRegion}
+                                showVehicleDetails={showVehicleDetails}
+                                videoCaptureEnabled={videoCaptureEnabled}
+                            />
+                        ))}
+                    </ul>
+                ) : (
+                    <div className="py-10 px-4">
+                        <EmptyState hasFilters={activeFilterCount > 0} onClear={handleClearFilters} />
+                    </div>
+                )}
+            </div>
+
+            <div className="hidden md:block rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden">
+                {/*
+                  * The table body scrolls inside its own viewport rather than
+                  * with the page, which is what makes the pinned header work.
+                  *
+                  * Setting overflow on one axis forces the other to auto, so
+                  * the horizontal-scroll wrapper this component already had was
+                  * silently becoming the sticky containing block. Because that
+                  * wrapper never scrolled vertically, a header stuck to it
+                  * never engaged and simply scrolled away with the page.
+                  *
+                  * Giving the wrapper a bounded height and both axes makes it a
+                  * real scroll container, so top-0 pins against something that
+                  * actually moves. It also keeps the filter bar on screen while
+                  * paging through rows, which is the behaviour you want when
+                  * narrowing 4,279 detections.
+                  */}
+                <Table containerClassName="max-h-[calc(100vh-15rem)] overflow-auto">
+                    <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_var(--border)]">
                         <TableRow>
-                            <TableHead className="w-[120px] pl-6">Image</TableHead>
-                            <TableHead>Plate</TableHead>
-                            {showVehicleDetails && <TableHead>Vehicle</TableHead>}
-                            {showVehicleDetails && <TableHead>MOT</TableHead>}
-                            {showVehicleDetails && <TableHead>Tax</TableHead>}
-                            {showVehicleDetails && <TableHead>Registration</TableHead>}
-                            {videoCaptureEnabled && <TableHead className="w-[120px]">Video</TableHead>}
-                            <TableHead className="text-left pr-6">Last seen</TableHead>
+                            {show("image") && <TableHead className="w-[104px] pl-4">Image</TableHead>}
+                            <SortableHead label="Plate" sortKey="plate" activeSort={activeSort} activeDir={activeDir} onSort={handleSort} />
+                            {show("vehicle") && (
+                                <SortableHead label="Vehicle" sortKey="make" activeSort={activeSort} activeDir={activeDir} onSort={handleSort} />
+                            )}
+                            {show("mot") && (
+                                <SortableHead label="MOT" sortKey="mot" activeSort={activeSort} activeDir={activeDir} onSort={handleSort} />
+                            )}
+                            {show("tax") && (
+                                <SortableHead label="Tax" sortKey="tax" activeSort={activeSort} activeDir={activeDir} onSort={handleSort} />
+                            )}
+                            {show("registration") && (
+                                <SortableHead label="Registration" sortKey="year" activeSort={activeSort} activeDir={activeDir} onSort={handleSort} />
+                            )}
+                            {show("video") && <TableHead className="w-[104px]">Video</TableHead>}
+                            <SortableHead label="Last seen" sortKey="seen" activeSort={activeSort} activeDir={activeDir} onSort={handleSort} className="pr-4" />
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        <AnimatePresence>
-                            {plates.length > 0 ? (
-                                plates.map((plate) => (
-                                    <motion.tr
-                                        key={plate.id}
-                                        layoutId={`plate-${plate.id}`}
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        exit={{ opacity: 0 }}
-                                        transition={{ duration: 0.25, ease: "easeOut" }}
-                                        className="hover:bg-muted/40 transition-colors"
-                                    >
-                                        <TableCell className="pl-6 py-2">
-                                            <div className="w-28 aspect-video rounded-md overflow-hidden bg-muted border">
-                                                {plate.image_url ? (
-                                                    <img
-                                                        src={plate.image_url}
-                                                        alt={`Capture of ${plate.plate_number}`}
-                                                        className="w-full h-full object-cover"
-                                                    />
-                                                ) : (
-                                                    <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                                                        <ImageOff className="h-4 w-4" />
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </TableCell>
+                        {/*
+                          * Rows are not animated. A monitoring table refreshes
+                          * on its own and can hold hundreds of rows, so a
+                          * per-row enter and exit means the list is in motion
+                          * whenever new detections arrive — which is exactly
+                          * when someone is trying to read it. Animating a
+                          * high-frequency list costs legibility and layout
+                          * work and buys nothing.
+                          */}
+                        {plates.length > 0 ? (
+                            plates.map((plate) => (
+                                    <TableRow key={plate.id}>
+                                        {show("image") && (
+                                            <TableCell className={cn("pl-4", isCompact ? "py-1" : "py-1.5")}>
+                                                <PlateImage
+                                                    imageUrl={plate.image_url}
+                                                    plateNumber={plate.plate_number}
+                                                    appRegion={appRegion}
+                                                    capturedAt={plate.recent_capture_time}
+                                                    className={isCompact ? "w-12" : "w-20"}
+                                                />
+                                            </TableCell>
+                                        )}
                                         <TableCell className="align-middle">
-                                            <div className={appRegion === "UK" ? styles.ukPlateStyle : styles.intlPlateStyle}>
-                                                {formatPlate(plate.plate_number)}
-                                            </div>
+                                            <PlateLink plateNumber={plate.plate_number} appRegion={appRegion} />
                                         </TableCell>
-                                        {showVehicleDetails && (
-                                            <>
-                                                <TableCell className="align-middle">
-                                                    <div className="font-semibold">{plate.car_make || "N/A"}</div>
+                                        {show("vehicle") && (
+                                            <TableCell className="align-middle">
+                                                <div className="font-semibold">{plate.car_make || "N/A"}</div>
+                                                {/*
+                                                  * Compact drops the secondary
+                                                  * line rather than shrinking
+                                                  * it. Halving a row's height
+                                                  * while keeping two lines of
+                                                  * text just makes both of them
+                                                  * cramped; choosing what to
+                                                  * omit is the actual work.
+                                                  */}
+                                                {!isCompact && (
                                                     <div className="text-sm text-muted-foreground">
                                                         {plate.car_color || "N/A"} • {plate.fuel_type || "N/A"}
                                                     </div>
-                                                </TableCell>
-                                                <TableCell className="align-middle">
-                                                    <div className={cn(styles.badge, getStatusClass(plate.mot_status))}>
-                                                        {plate.mot_status || "N/A"}
+                                                )}
+                                            </TableCell>
+                                        )}
+                                        {show("mot") && (
+                                            <TableCell className="align-middle">
+                                                <StatusBadge status={plate.mot_status} />
+                                                {!isCompact && plate.mot_expiry_date && (
+                                                    <div className="text-xs text-muted-foreground mt-1">
+                                                        Expires {dayjs(plate.mot_expiry_date).format("DD/MM/YYYY")}
                                                     </div>
-                                                    {plate.mot_expiry_date && (
-                                                        <div className="text-xs text-muted-foreground mt-1">
-                                                            Expires {dayjs(plate.mot_expiry_date).format("DD/MM/YYYY")}
-                                                        </div>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="align-middle">
-                                                    <div className={cn(styles.badge, getStatusClass(plate.tax_status))}>
-                                                        {plate.tax_status || "N/A"}
+                                                )}
+                                            </TableCell>
+                                        )}
+                                        {show("tax") && (
+                                            <TableCell className="align-middle">
+                                                <StatusBadge status={plate.tax_status} />
+                                                {!isCompact && plate.tax_due_date && (
+                                                    <div className="text-xs text-muted-foreground mt-1">
+                                                        Due {dayjs(plate.tax_due_date).format("DD/MM/YYYY")}
                                                     </div>
-                                                    {plate.tax_due_date && (
-                                                        <div className="text-xs text-muted-foreground mt-1">
-                                                            Due {dayjs(plate.tax_due_date).format("DD/MM/YYYY")}
-                                                        </div>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="align-middle">
-                                                    <div className="font-semibold">{plate.year_of_manufacture || "N/A"}</div>
+                                                )}
+                                            </TableCell>
+                                        )}
+                                        {show("registration") && (
+                                            <TableCell className="align-middle">
+                                                <div className="font-semibold">{plate.year_of_manufacture || "N/A"}</div>
+                                                {!isCompact && (
                                                     <div className="text-sm text-muted-foreground">
                                                         {plate.month_of_first_registration
                                                             ? `Reg: ${dayjs(plate.month_of_first_registration).format("MMM YYYY")}`
                                                             : "N/A"}
                                                     </div>
-                                                </TableCell>
-                                            </>
+                                                )}
+                                            </TableCell>
                                         )}
-                                        {videoCaptureEnabled && (
+                                        {show("video") && (
                                             <TableCell className="align-middle">
                                                 {plate.video_url ? (
                                                     <PlateVideoPlayer
                                                         videoUrl={plate.video_url}
                                                         plateNumber={plate.plate_number}
                                                         appRegion={appRegion}
+                                                        tileClassName={isCompact ? "w-12" : "w-20"}
                                                     />
                                                 ) : (
-                                                    <div className="w-28 aspect-video bg-muted border rounded-md flex items-center justify-center text-muted-foreground">
-                                                        <VideoOff className="w-4 h-4" />
+                                                    <div className={cn(
+                                                        isCompact ? "w-12" : "w-20",
+                                                        "aspect-video bg-muted border rounded flex items-center justify-center text-muted-foreground",
+                                                    )}>
+                                                        <VideoOff className="w-4 h-4" aria-hidden />
+                                                        <span className="sr-only">No clip expected</span>
                                                     </div>
                                                 )}
                                             </TableCell>
                                         )}
-                                        <TableCell className="text-left align-middle pr-6">
-                                            <div className="font-semibold">{dayjs(plate.recent_capture_time).fromNow()}</div>
-                                            <div className="text-xs text-muted-foreground">
-                                                {dayjs(plate.recent_capture_time).format("DD/MM/YY HH:mm")}
-                                            </div>
+                                        <TableCell className="text-left align-middle pr-4">
+                                            <div className="font-medium">{dayjs(plate.recent_capture_time).fromNow()}</div>
+                                            {!isCompact && (
+                                                <time
+                                                    dateTime={dayjs(plate.recent_capture_time).toISOString()}
+                                                    className="text-xs text-muted-foreground"
+                                                >
+                                                    {dayjs(plate.recent_capture_time).format("DD/MM/YY HH:mm")}
+                                                </time>
+                                            )}
                                         </TableCell>
-                                    </motion.tr>
+                                    </TableRow>
                                 ))
                             ) : (
                                 <TableRow>
                                     <TableCell
-                                        colSpan={showVehicleDetails ? (videoCaptureEnabled ? 8 : 7) : (videoCaptureEnabled ? 4 : 3)}
-                                        className="h-24 text-center text-muted-foreground"
+                                        colSpan={visibleColumnCount}
+                                        className="py-10"
                                     >
-                                        No results found.
+                                        <EmptyState
+                                            hasFilters={activeFilterCount > 0}
+                                            onClear={handleClearFilters}
+                                        />
                                     </TableCell>
                                 </TableRow>
                             )}
-                        </AnimatePresence>
                     </TableBody>
                 </Table>
             </div>

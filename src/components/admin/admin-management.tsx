@@ -83,7 +83,18 @@ export function AdminManagement({ currentUserEmail }: { currentUserEmail: string
             </CardHeader>
             <CardContent className="space-y-6">
                 <form onSubmit={handleAddAdmin} className="flex flex-col sm:flex-row gap-2">
+                    {/*
+                      * A real label, not just a placeholder. The placeholder
+                      * disappears the moment you type, so the field loses its
+                      * name exactly while it is being filled in — and this one
+                      * grants administrative access, which is the last place to
+                      * leave someone guessing what they are typing into.
+                      */}
+                    <label htmlFor="new-admin-email" className="sr-only">
+                        Email address to grant admin access
+                    </label>
                     <Input
+                        id="new-admin-email"
                         type="email"
                         placeholder="new.admin@example.com"
                         value={newAdminEmail}
