@@ -66,6 +66,54 @@ const getStatusClass = (status: string | null): string => {
 
 const formatNumber = (n: number) => new Intl.NumberFormat("en-GB").format(n);
 
+type FilterKey = "make" | "color" | "year" | "mot" | "tax";
+
+/**
+ * A labelled filter dropdown.
+ *
+ * Radix renders its trigger as a button whose only content is the selected
+ * value, so a trigger showing "All makes" announces as an unnamed button —
+ * the control has no name at all until you already know what it filters.
+ *
+ * The name has to carry the visible text as well as the field, not replace
+ * it. WCAG 2.5.3 requires the accessible name to contain the visible label,
+ * so that someone using voice control can say what they can see: with a bare
+ * aria-label of "Filter by make", saying "click all makes" matches nothing.
+ * Composing the two gives "Filter by make: All makes", which satisfies both
+ * the screen reader and the voice user.
+ */
+function FilterSelect({
+    label,
+    anyLabel,
+    options,
+    value,
+    onChange,
+}: {
+    label: string;
+    anyLabel: string;
+    options: readonly string[];
+    value: string;
+    onChange: (value: string) => void;
+}) {
+    const visibleText = value && value !== "all" ? value : anyLabel;
+
+    return (
+        <Select value={value} onValueChange={onChange}>
+            <SelectTrigger className="w-full h-9" aria-label={`${label}: ${visibleText}`}>
+                <SelectValue placeholder={anyLabel} />
+            </SelectTrigger>
+            <SelectContent>
+                <SelectItem value="all">{anyLabel}</SelectItem>
+                {options.map((option) => (
+                    <SelectItem key={option} value={option}>
+                        {option}
+                    </SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
+    );
+}
+
 export function PlatesTable({
     initialApiData,
     error,
@@ -158,6 +206,23 @@ export function PlatesTable({
         Object.entries(filters).filter(([k, v]) => k !== "search" && v && v !== "all").length +
         (filters.search ? 1 : 0);
 
+    const filterFields = useMemo(
+        () =>
+            [
+                { key: "make", label: "Filter by make", anyLabel: "All makes", options: filterOptions.makes },
+                { key: "color", label: "Filter by colour", anyLabel: "All colors", options: filterOptions.colors },
+                {
+                    key: "year",
+                    label: "Filter by year of manufacture",
+                    anyLabel: "All years",
+                    options: filterOptions.years.map(String),
+                },
+                { key: "mot", label: "Filter by MOT status", anyLabel: "All MOT", options: filterOptions.motStatuses },
+                { key: "tax", label: "Filter by tax status", anyLabel: "All tax", options: filterOptions.taxStatuses },
+            ] satisfies readonly { key: FilterKey; label: string; anyLabel: string; options: readonly string[] }[],
+        [filterOptions],
+    );
+
     if (error) {
         return (
             <Alert variant="destructive">
@@ -171,8 +236,13 @@ export function PlatesTable({
         <div className="space-y-4">
             <Card className="p-4 sm:p-5 gap-4">
                 <div className="relative">
+                    <label htmlFor="plate-search" className="sr-only">
+                        Search license plates
+                    </label>
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden />
                     <Input
+                        id="plate-search"
+                        type="search"
                         placeholder="Search for a license plate..."
                         value={filters.search}
                         onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
@@ -192,41 +262,16 @@ export function PlatesTable({
                 {showVehicleDetails && (
                     <>
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-                            <Select value={filters.make} onValueChange={(v) => setFilters((f) => ({ ...f, make: v }))}>
-                                <SelectTrigger className="w-full h-9"><SelectValue placeholder="All makes" /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All makes</SelectItem>
-                                    {filterOptions.makes.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                            <Select value={filters.color} onValueChange={(v) => setFilters((f) => ({ ...f, color: v }))}>
-                                <SelectTrigger className="w-full h-9"><SelectValue placeholder="All colors" /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All colors</SelectItem>
-                                    {filterOptions.colors.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                            <Select value={filters.year} onValueChange={(v) => setFilters((f) => ({ ...f, year: v }))}>
-                                <SelectTrigger className="w-full h-9"><SelectValue placeholder="All years" /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All years</SelectItem>
-                                    {filterOptions.years.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                            <Select value={filters.mot} onValueChange={(v) => setFilters((f) => ({ ...f, mot: v }))}>
-                                <SelectTrigger className="w-full h-9"><SelectValue placeholder="All MOT" /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All MOT</SelectItem>
-                                    {filterOptions.motStatuses.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                            <Select value={filters.tax} onValueChange={(v) => setFilters((f) => ({ ...f, tax: v }))}>
-                                <SelectTrigger className="w-full h-9"><SelectValue placeholder="All tax" /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All tax</SelectItem>
-                                    {filterOptions.taxStatuses.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
+                            {filterFields.map((field) => (
+                                <FilterSelect
+                                    key={field.key}
+                                    label={field.label}
+                                    anyLabel={field.anyLabel}
+                                    options={field.options}
+                                    value={filters[field.key]}
+                                    onChange={(v) => setFilters((f) => ({ ...f, [field.key]: v }))}
+                                />
+                            ))}
                         </div>
 
                         <div className="flex items-center justify-between gap-2">
