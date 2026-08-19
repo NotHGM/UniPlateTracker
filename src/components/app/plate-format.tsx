@@ -1,6 +1,5 @@
 import React from "react";
 import { cn } from "@/lib/utils";
-import styles from "./plates.module.css";
 
 /**
  * Shared presentation primitives for a detected plate.
@@ -9,6 +8,11 @@ import styles from "./plates.module.css";
  * thing that renders them: the narrow-viewport card list shows the same
  * plate, the same status and the same absence-of-data, and two copies of
  * that logic would drift the moment either one is touched.
+ *
+ * All styling comes from the token layer in globals.css. It used to live in
+ * plates.module.css with the plate yellow hardcoded as #FBBF24, which meant
+ * the most recognisable element in the product sat outside the design system
+ * entirely and could not respond to it.
  */
 
 /**
@@ -48,44 +52,46 @@ export function PlateTag({
     className?: string;
 }) {
     return (
-        <div className={cn(appRegion === "UK" ? styles.ukPlateStyle : styles.intlPlateStyle, className)}>
+        <span className={cn("plate", appRegion === "UK" ? "plate-uk" : "plate-intl", className)}>
             {formatPlate(plateNumber)}
-        </div>
+        </span>
     );
 }
+
+type StatusTone = "ok" | "alert" | "warn" | "unknown";
+
+/**
+ * The DVLA returns this whole sentence where it holds no record. It is far
+ * too long to sit in a chip beside values like "Valid" and "Taxed", and it
+ * pushed the chip row onto a second line on narrow screens. Shortened for
+ * display, with the original preserved in the title so nothing is lost.
+ */
+const NO_DVLA_RECORD = /no details held by dvla/i;
 
 /**
  * How a DVLA status string maps to a visual weight.
  *
  * Deliberately conservative about what counts as good news. Anything the
- * DVLA did not tell us falls through to the neutral treatment rather than
- * being coloured, because an unknown status is missing information and
- * should not look like a clean bill of health.
+ * DVLA did not tell us falls through to `unknown` rather than being
+ * coloured, because missing information should never look like a clean bill
+ * of health.
  */
-export function getStatusTone(status: string | null): "success" | "destructive" | "warning" | "neutral" {
-    if (!status) return "neutral";
+export function getStatusTone(status: string | null): StatusTone {
+    if (!status || NO_DVLA_RECORD.test(status)) return "unknown";
 
     const lower = status.toLowerCase();
-    if (lower === "valid" || lower === "taxed") return "success";
-    if (lower.includes("expire") || lower.includes("due") || lower.includes("not taxed")) return "destructive";
-    if (lower.includes("sorn") || lower.includes("untaxed")) return "warning";
-    return "neutral";
+    if (lower === "valid" || lower === "taxed") return "ok";
+    if (lower.includes("expire") || lower.includes("due") || lower.includes("not taxed")) return "alert";
+    if (lower.includes("sorn") || lower.includes("untaxed")) return "warn";
+    return "unknown";
 }
 
-const TONE_CLASS: Record<ReturnType<typeof getStatusTone>, string> = {
-    success: styles.badgeSuccess,
-    destructive: styles.badgeDestructive,
-    warning: styles.badgeWarning,
-    neutral: styles.badgeSecondary,
+const TONE_CLASS: Record<StatusTone, string> = {
+    ok: "chip-ok",
+    alert: "chip-alert",
+    warn: "chip-warn",
+    unknown: "chip-unknown",
 };
-
-/**
- * The DVLA returns this whole sentence where it holds no record. It is far
- * too long to sit in a badge next to values like "Valid" and "Taxed", and it
- * pushed the badge row onto a second line on narrow screens. Shortened for
- * display, with the original preserved in the title so nothing is lost.
- */
-const NO_DVLA_RECORD = /no details held by dvla/i;
 
 /**
  * `prefix` is display only and never feeds the tone lookup. Folding it into
@@ -93,15 +99,13 @@ const NO_DVLA_RECORD = /no details held by dvla/i;
  * "Valid" — and turn a good status neutral without anything failing loudly.
  */
 export function StatusBadge({ status, prefix }: { status: string | null; prefix?: string }) {
-    const isUnknown = !status || NO_DVLA_RECORD.test(status);
-    const text = isUnknown ? "Unknown" : (status as string);
+    const tone = getStatusTone(status);
+    const isUnknown = tone === "unknown";
+    const text = !status || NO_DVLA_RECORD.test(status) ? "Unknown" : status;
 
     return (
-        <div
-            className={cn(styles.badge, TONE_CLASS[getStatusTone(status)])}
-            title={isUnknown && status ? status : undefined}
-        >
+        <span className={cn("chip", TONE_CLASS[tone])} title={isUnknown && status ? status : undefined}>
             {prefix ? `${prefix} ${text}` : text}
-        </div>
+        </span>
     );
 }
