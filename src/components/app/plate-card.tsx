@@ -3,7 +3,7 @@
 import dayjs from "dayjs";
 import { ImageOff } from "lucide-react";
 import { LicensePlate } from "@/lib/types";
-import { PlateTag, StatusBadge } from "./plate-format";
+import { PlateLink, StatusBadge } from "./plate-format";
 import { PlateVideoPlayer } from "./plate-video-player";
 
 /**
@@ -65,7 +65,7 @@ export function PlateCard({
 
                 <div className="min-w-0 flex-1 space-y-1.5">
                     <div className="flex items-start justify-between gap-2">
-                        <PlateTag plateNumber={plate.plate_number} appRegion={appRegion} />
+                        <PlateLink plateNumber={plate.plate_number} appRegion={appRegion} />
                         <time
                             dateTime={seenAt.toISOString()}
                             title={seenAt.format("DD/MM/YYYY HH:mm")}

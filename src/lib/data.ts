@@ -36,6 +36,56 @@ const dailyDetectionsQuery = `
     ORDER BY d.day;
 `;
 
+/**
+ * Everything known about one registration.
+ *
+ * The list view answers "what has been seen recently". This answers "what do I
+ * know about this vehicle", which is the question someone actually has when a
+ * particular plate catches their eye — and which previously required reading
+ * the table and hoping the same plate appeared again on the same page.
+ *
+ * Returns null when the plate has never been seen, so the caller can render a
+ * 404 rather than an empty page that looks like a broken query.
+ */
+export async function getPlateHistory(plateNumber: string) {
+    const client = await pool.connect();
+
+    try {
+        // Normalised on both sides so a URL carrying "GL75 VFR" or "gl75vfr"
+        // finds a row stored as GL75VFR.
+        const normalised = plateNumber.toUpperCase().replace(/\s/g, "");
+
+        const sightingsResult = await client.query(
+            `SELECT * FROM license_plates
+             WHERE UPPER(REPLACE(plate_number, ' ', '')) = $1
+             ORDER BY recent_capture_time DESC`,
+            [normalised],
+        );
+
+        if (sightingsResult.rows.length === 0) return null;
+
+        const sightings = sightingsResult.rows;
+
+        /*
+         * Vehicle details come from the most recent sighting rather than being
+         * merged across all of them. DVLA data changes over time — a car gets
+         * taxed, an MOT expires — and showing the newest known state is
+         * honest, whereas combining fields from different dates would invent a
+         * vehicle that never existed in that condition.
+         */
+        return {
+            plateNumber: sightings[0].plate_number,
+            vehicle: sightings[0],
+            sightings,
+            firstSeen: sightings[sightings.length - 1].recent_capture_time,
+            lastSeen: sightings[0].recent_capture_time,
+            totalSightings: sightings.length,
+        };
+    } finally {
+        client.release();
+    }
+}
+
 export async function getAdminStats() {
     const client = await pool.connect();
     try {

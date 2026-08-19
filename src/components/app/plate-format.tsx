@@ -1,4 +1,5 @@
 import React from "react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 /**
@@ -55,6 +56,40 @@ export function PlateTag({
         <span className={cn("plate", appRegion === "UK" ? "plate-uk" : "plate-intl", className)}>
             {formatPlate(plateNumber)}
         </span>
+    );
+}
+
+/**
+ * The plate as a link to everything known about that vehicle.
+ *
+ * The plate is the natural thing to click — it is what identifies the row and
+ * what someone is looking at when they decide they want to know more — so it
+ * carries the affordance rather than a separate "view" control taking up a
+ * column. The accessible name spells out the destination, because "GL75 VFR"
+ * alone does not tell a screen reader user that this is a link to a history.
+ */
+export function PlateLink({
+    plateNumber,
+    appRegion,
+    className,
+}: {
+    plateNumber: string | null;
+    appRegion: "UK" | "INTERNATIONAL";
+    className?: string;
+}) {
+    if (!plateNumber) return <PlateTag plateNumber={plateNumber} appRegion={appRegion} className={className} />;
+
+    return (
+        <Link
+            href={`/plate/${encodeURIComponent(plateNumber)}`}
+            aria-label={`${plateNumber}, view all sightings`}
+            className={cn(
+                "inline-block rounded-sm transition-opacity hover:opacity-80",
+                "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none",
+            )}
+        >
+            <PlateTag plateNumber={plateNumber} appRegion={appRegion} className={className} />
+        </Link>
     );
 }
 

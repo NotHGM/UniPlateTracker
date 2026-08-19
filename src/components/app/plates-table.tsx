@@ -18,7 +18,7 @@ import { ArrowDown, ArrowUp, ChevronsUpDown, Download, ImageOff, RefreshCw, Sear
 import { cn } from "@/lib/utils";
 import { PlateVideoPlayer } from "./plate-video-player";
 import { PlateCard } from "./plate-card";
-import { PlateTag, StatusBadge } from "./plate-format";
+import { PlateLink, StatusBadge } from "./plate-format";
 
 dayjs.extend(relativeTime);
 
@@ -497,7 +497,7 @@ export function PlatesTable({
                                             </div>
                                         </TableCell>
                                         <TableCell className="align-middle">
-                                            <PlateTag plateNumber={plate.plate_number} appRegion={appRegion} />
+                                            <PlateLink plateNumber={plate.plate_number} appRegion={appRegion} />
                                         </TableCell>
                                         {showVehicleDetails && (
                                             <>
