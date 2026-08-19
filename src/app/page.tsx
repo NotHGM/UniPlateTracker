@@ -19,10 +19,12 @@ export default function HomePage() {
 
     return (
         <>
-            <PageHeader
-                title="Detections"
-                description="Every plate seen by your cameras, newest first."
-            />
+            {/*
+              * Deliberately does not claim an order. The table is sortable by
+              * six columns now, so "newest first" would be a lie the moment
+              * anyone touched a header.
+              */}
+            <PageHeader title="Detections" description="Every plate seen by your cameras." />
             <Suspense fallback={<DashboardSkeleton />}>
                 <HomePageClient
                     appRegion={appRegion}

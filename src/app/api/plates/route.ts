@@ -4,6 +4,28 @@ import pool from '@/lib/db';
 import { z } from 'zod';
 import type { PoolClient } from 'pg';
 
+/**
+ * Sortable columns, as an allow-list.
+ *
+ * A column name cannot be passed as a query parameter — it is part of the SQL
+ * text, not a value — so the only safe way to accept one from the client is to
+ * map an opaque key onto a literal defined here. Interpolating the request
+ * value directly would be an injection point.
+ *
+ * Sorting has to happen in the database for a second reason. The client only
+ * ever holds one page of a result set that is currently 4,279 rows, so sorting
+ * what it has produces a confidently ordered page that is not the top of
+ * anything — wrong in a way nobody notices.
+ */
+const SORT_COLUMNS = {
+    seen: "recent_capture_time",
+    plate: "plate_number",
+    make: "car_make",
+    year: "year_of_manufacture",
+    mot: "mot_status",
+    tax: "tax_status",
+} as const;
+
 const QuerySchema = z.object({
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(10),
@@ -13,6 +35,8 @@ const QuerySchema = z.object({
     year: z.coerce.number().int().optional(),
     tax: z.string().optional(),
     mot: z.string().optional(),
+    sort: z.enum(Object.keys(SORT_COLUMNS) as [keyof typeof SORT_COLUMNS]).default("seen"),
+    dir: z.enum(["asc", "desc"]).default("desc"),
 });
 
 export async function GET(request: NextRequest) {
@@ -23,7 +47,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid query parameters' }, { status: 400 });
     }
 
-    const { page, limit, search, make, color, year, tax, mot } = validation.data;
+    const { page, limit, search, make, color, year, tax, mot, sort, dir } = validation.data;
     const offset = (page - 1) * limit;
 
     const conditions: string[] = [];
@@ -53,7 +77,25 @@ export async function GET(request: NextRequest) {
         const dbClient: PoolClient = await pool.connect();
         client = dbClient;
 
-        const dataQuery = `SELECT * FROM license_plates ${whereClause} ORDER BY recent_capture_time DESC LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
+        /*
+         * Both halves of the ORDER BY come from validated enums rather than
+         * from the request text, so neither can carry arbitrary SQL.
+         *
+         * NULLS LAST matters here because most sortable columns are nullable:
+         * a vehicle the DVLA holds no record for has no make, MOT or tax
+         * status. Postgres sorts nulls first on DESC by default, which would
+         * open every descending sort with a screen of blanks.
+         *
+         * The id tiebreak keeps paging stable. Without it, rows sharing a
+         * value — every plate with the same make, say — can come back in a
+         * different order per query, so the same row appears on two pages or
+         * on neither.
+         */
+        const sortColumn = SORT_COLUMNS[sort];
+        const sortDirection = dir === "asc" ? "ASC" : "DESC";
+        const orderBy = `ORDER BY ${sortColumn} ${sortDirection} NULLS LAST, id DESC`;
+
+        const dataQuery = `SELECT * FROM license_plates ${whereClause} ${orderBy} LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
         const dataResult = await dbClient.query(dataQuery, [...queryParams, limit, offset]);
 
         const countQuery = `SELECT COUNT(*) FROM license_plates ${whereClause}`;

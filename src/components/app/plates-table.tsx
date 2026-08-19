@@ -14,7 +14,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import useSWR from "swr";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
-import { ImageOff, RefreshCw, Search, VideoOff, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronsUpDown, ImageOff, RefreshCw, Search, VideoOff, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { PlateVideoPlayer } from "./plate-video-player";
 import { PlateCard } from "./plate-card";
 import { PlateTag, StatusBadge } from "./plate-format";
@@ -32,6 +33,99 @@ interface PlatesTableProps {
 }
 
 const formatNumber = (n: number) => new Intl.NumberFormat("en-GB").format(n);
+
+type SortKey = "seen" | "plate" | "make" | "year" | "mot" | "tax";
+type SortDir = "asc" | "desc";
+
+/**
+ * Two different nothings.
+ *
+ * An empty table previously said "No results found" regardless of cause, which
+ * conflates a fresh install with a dead-end filter combination. They call for
+ * opposite responses: one means wait for the cameras, the other means the way
+ * out is to widen the filters, so the way out is offered directly.
+ */
+function EmptyState({ hasFilters, onClear }: { hasFilters: boolean; onClear: () => void }) {
+    if (!hasFilters) {
+        return (
+            <div className="text-center space-y-1">
+                <p className="font-medium">No detections yet</p>
+                <p className="text-sm text-muted-foreground">
+                    Plates will appear here as your cameras report them.
+                </p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="text-center space-y-2">
+            <div className="space-y-1">
+                <p className="font-medium">No matching detections</p>
+                <p className="text-sm text-muted-foreground">
+                    No plate matches every filter you have applied.
+                </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={onClear}>
+                Clear filters
+            </Button>
+        </div>
+    );
+}
+
+/**
+ * A column header that sorts.
+ *
+ * Rendered as a real button inside the th rather than a click handler on the
+ * th itself, so it is reachable by keyboard and announced as an interactive
+ * control. aria-sort on the header cell is what tells a screen reader which
+ * column the table is currently ordered by, and in which direction — the
+ * arrow glyph alone communicates that to sighted users only.
+ */
+function SortableHead({
+    label,
+    sortKey,
+    activeSort,
+    activeDir,
+    onSort,
+    className,
+}: {
+    label: string;
+    sortKey: SortKey;
+    activeSort: SortKey;
+    activeDir: SortDir;
+    onSort: (key: SortKey) => void;
+    className?: string;
+}) {
+    const isActive = activeSort === sortKey;
+
+    return (
+        <TableHead
+            className={className}
+            aria-sort={isActive ? (activeDir === "asc" ? "ascending" : "descending") : "none"}
+        >
+            <button
+                type="button"
+                onClick={() => onSort(sortKey)}
+                className={cn(
+                    "inline-flex items-center gap-1 rounded-sm -mx-1 px-1 py-0.5 transition-colors",
+                    "hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                    isActive ? "text-foreground" : "text-muted-foreground",
+                )}
+            >
+                {label}
+                {isActive ? (
+                    activeDir === "asc" ? (
+                        <ArrowUp className="h-3 w-3" aria-hidden />
+                    ) : (
+                        <ArrowDown className="h-3 w-3" aria-hidden />
+                    )
+                ) : (
+                    <ChevronsUpDown className="h-3 w-3 opacity-40" aria-hidden />
+                )}
+            </button>
+        </TableHead>
+    );
+}
 
 type FilterKey = "make" | "color" | "year" | "mot" | "tax";
 
@@ -164,6 +258,25 @@ export function PlatesTable({
 
     const handleShowNewPlates = () => router.push(pathname);
 
+    const activeSort = (searchParams.get("sort") as SortKey) || "seen";
+    const activeDir = (searchParams.get("dir") as SortDir) || "desc";
+
+    /**
+     * Clicking the active column flips direction; clicking a new one starts
+     * descending, because for every column here the interesting end is the
+     * recent or the largest. Sorting always returns to page one — staying on
+     * page 12 of a freshly reordered set puts you somewhere arbitrary.
+     */
+    const handleSort = (key: SortKey) => {
+        const params = new URLSearchParams(searchParams.toString());
+        const nextDir: SortDir = activeSort === key && activeDir === "desc" ? "asc" : "desc";
+
+        params.set("sort", key);
+        params.set("dir", nextDir);
+        params.set("page", "1");
+        router.push(`${pathname}?${params.toString()}`, { scroll: false });
+    };
+
     const showVehicleDetails = appRegion === "UK" || internationalApiEnabled;
     const pagination = initialApiData?.pagination ?? { currentPage: 1, totalPages: 0, totalRows: 0 };
     const filterOptions = initialApiData?.filterOptions ?? { makes: [], colors: [], years: [], motStatuses: [], taxStatuses: [] };
@@ -293,7 +406,9 @@ export function PlatesTable({
                         ))}
                     </ul>
                 ) : (
-                    <p className="p-6 text-center text-sm text-muted-foreground">No results found.</p>
+                    <div className="py-10 px-4">
+                        <EmptyState hasFilters={activeFilterCount > 0} onClear={handleClearFilters} />
+                    </div>
                 )}
             </div>
 
@@ -318,13 +433,21 @@ export function PlatesTable({
                     <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_var(--border)]">
                         <TableRow>
                             <TableHead className="w-[104px] pl-4">Image</TableHead>
-                            <TableHead>Plate</TableHead>
-                            {showVehicleDetails && <TableHead>Vehicle</TableHead>}
-                            {showVehicleDetails && <TableHead>MOT</TableHead>}
-                            {showVehicleDetails && <TableHead>Tax</TableHead>}
-                            {showVehicleDetails && <TableHead>Registration</TableHead>}
+                            <SortableHead label="Plate" sortKey="plate" activeSort={activeSort} activeDir={activeDir} onSort={handleSort} />
+                            {showVehicleDetails && (
+                                <SortableHead label="Vehicle" sortKey="make" activeSort={activeSort} activeDir={activeDir} onSort={handleSort} />
+                            )}
+                            {showVehicleDetails && (
+                                <SortableHead label="MOT" sortKey="mot" activeSort={activeSort} activeDir={activeDir} onSort={handleSort} />
+                            )}
+                            {showVehicleDetails && (
+                                <SortableHead label="Tax" sortKey="tax" activeSort={activeSort} activeDir={activeDir} onSort={handleSort} />
+                            )}
+                            {showVehicleDetails && (
+                                <SortableHead label="Registration" sortKey="year" activeSort={activeSort} activeDir={activeDir} onSort={handleSort} />
+                            )}
                             {videoCaptureEnabled && <TableHead className="w-[104px]">Video</TableHead>}
-                            <TableHead className="text-left pr-4">Last seen</TableHead>
+                            <SortableHead label="Last seen" sortKey="seen" activeSort={activeSort} activeDir={activeDir} onSort={handleSort} className="pr-4" />
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -423,9 +546,12 @@ export function PlatesTable({
                                 <TableRow>
                                     <TableCell
                                         colSpan={showVehicleDetails ? (videoCaptureEnabled ? 8 : 7) : (videoCaptureEnabled ? 4 : 3)}
-                                        className="h-24 text-center text-muted-foreground"
+                                        className="py-10"
                                     >
-                                        No results found.
+                                        <EmptyState
+                                            hasFilters={activeFilterCount > 0}
+                                            onClear={handleClearFilters}
+                                        />
                                     </TableCell>
                                 </TableRow>
                             )}
