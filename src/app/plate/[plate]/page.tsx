@@ -33,33 +33,25 @@ export default async function PlateDetailPage({ params }: { params: Promise<{ pl
     const videoCaptureEnabled = process.env.ENABLE_VIDEO_CAPTURE === "true";
     const showVehicleDetails = appRegion === "UK" || process.env.ENABLE_INTERNATIONAL_API === "true";
 
-    const { vehicle, sightings, firstSeen, lastSeen, totalSightings } = history;
+    const { vehicle, firstSeen, lastSeen, seenAgain } = history;
 
     return (
         <>
             <PageHeader
                 title="Vehicle"
                 /*
-                 * A single sighting, or several on one day, has no range to
-                 * describe — "between 19 Aug and 19 Aug" reads like a bug.
+                 * Says only what the schema knows. One row is kept per plate,
+                 * carrying its first and most recent sighting, so a count of
+                 * visits does not exist and claiming one would be inventing it.
                  */
                 description={
-                    totalSightings === 1 ? (
-                        <>Seen once, on {dayjs(lastSeen).format("D MMM YYYY")}</>
-                    ) : dayjs(firstSeen).isSame(dayjs(lastSeen), "day") ? (
+                    seenAgain ? (
                         <>
-                            Seen <span className="tabular-nums font-medium">{totalSightings}</span> times on{" "}
+                            Seen more than once, between {dayjs(firstSeen).format("D MMM YYYY")} and{" "}
                             {dayjs(lastSeen).format("D MMM YYYY")}
                         </>
                     ) : (
-                        <>
-                            Seen{" "}
-                            <span className="tabular-nums font-medium">
-                                {totalSightings.toLocaleString("en-GB")}
-                            </span>{" "}
-                            times between {dayjs(firstSeen).format("D MMM YYYY")} and{" "}
-                            {dayjs(lastSeen).format("D MMM YYYY")}
-                        </>
+                        <>Seen once, on {dayjs(lastSeen).format("D MMM YYYY")}</>
                     )
                 }
                 actions={
@@ -113,46 +105,66 @@ export default async function PlateDetailPage({ params }: { params: Promise<{ pl
                     )}
                 </Card>
 
+                {/*
+                  * First and most recent, rather than a list of every sighting.
+                  * The schema keeps one row per plate and overwrites
+                  * recent_capture_time when it is seen again, so the sightings
+                  * in between were never recorded. Listing the single row as
+                  * though it were a history would have implied this vehicle was
+                  * seen exactly once, which for 1,551 of the plates here is
+                  * simply untrue.
+                  */}
                 <div>
-                    <h2 className="text-sm font-medium mb-2">
-                        Sightings <span className="text-muted-foreground tabular-nums">({totalSightings})</span>
-                    </h2>
+                    <h2 className="text-sm font-medium mb-2">Sighting record</h2>
 
                     <Card className="p-0 overflow-hidden">
                         <ul className="divide-y">
-                            {sightings.map((sighting) => (
-                                <li key={sighting.id} className="flex items-center gap-3 p-3">
-                                    <PlateImage
-                                        imageUrl={sighting.image_url}
-                                        plateNumber={sighting.plate_number}
+                            <li className="flex items-center gap-3 p-3">
+                                <PlateImage
+                                    imageUrl={vehicle.image_url}
+                                    plateNumber={vehicle.plate_number}
+                                    appRegion={appRegion}
+                                    capturedAt={lastSeen}
+                                    className="w-24 shrink-0"
+                                />
+
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-xs text-muted-foreground">Most recent sighting</p>
+                                    <time
+                                        dateTime={new Date(lastSeen).toISOString()}
+                                        className="text-sm font-medium"
+                                    >
+                                        {dayjs(lastSeen).format("D MMM YYYY, HH:mm")} ·{" "}
+                                        {dayjs(lastSeen).format("dddd")}
+                                    </time>
+                                </div>
+
+                                {videoCaptureEnabled && vehicle.video_url && (
+                                    <PlateVideoPlayer
+                                        videoUrl={vehicle.video_url}
+                                        plateNumber={vehicle.plate_number}
                                         appRegion={appRegion}
-                                        capturedAt={sighting.recent_capture_time}
-                                        className="w-24 shrink-0"
                                     />
+                                )}
+                            </li>
 
-                                    <div className="min-w-0 flex-1">
-                                        <time
-                                            dateTime={new Date(sighting.recent_capture_time).toISOString()}
-                                            className="text-sm font-medium"
-                                        >
-                                            {dayjs(sighting.recent_capture_time).format("D MMM YYYY, HH:mm")}
-                                        </time>
-                                        <p className="text-xs text-muted-foreground">
-                                            {dayjs(sighting.recent_capture_time).format("dddd")}
-                                        </p>
-                                    </div>
-
-                                    {videoCaptureEnabled && sighting.video_url && (
-                                        <PlateVideoPlayer
-                                            videoUrl={sighting.video_url}
-                                            plateNumber={sighting.plate_number}
-                                            appRegion={appRegion}
-                                        />
-                                    )}
-                                </li>
-                            ))}
+                            <li className="p-3">
+                                <p className="text-xs text-muted-foreground">First sighting</p>
+                                <time
+                                    dateTime={new Date(firstSeen).toISOString()}
+                                    className="text-sm font-medium"
+                                >
+                                    {dayjs(firstSeen).format("D MMM YYYY, HH:mm")} ·{" "}
+                                    {dayjs(firstSeen).format("dddd")}
+                                </time>
+                            </li>
                         </ul>
                     </Card>
+
+                    <p className="text-xs text-muted-foreground mt-2">
+                        Only the first and most recent sighting are kept. Individual visits in between are not
+                        recorded, so this is not a count of how often the vehicle has passed the camera.
+                    </p>
                 </div>
             </div>
         </>

@@ -26,7 +26,15 @@ function TabsList({
     <TabsPrimitive.List
       data-slot="tabs-list"
       className={cn(
+        // Radix gives the list itself tabindex=0 as part of its roving focus,
+        // so it is a real tab stop — but it shipped with no focus style, which
+        // means keyboard users landed on it invisibly.
         "bg-muted text-muted-foreground inline-flex h-9 w-fit items-center justify-center rounded-lg p-[3px]",
+        // A real outline rather than a ring. Tailwind's ring is a box-shadow,
+        // which reads as "outline still removed" to tooling and disappears
+        // entirely under forced-colours mode, where box-shadow is dropped but
+        // outline is preserved.
+        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
         className
       )}
       {...props}

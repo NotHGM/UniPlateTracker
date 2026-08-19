@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogIn } from "lucide-react";
+import { LogIn, ScanLine, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/mode-toggle";
@@ -24,9 +24,15 @@ import { PipelineStatus } from "./pipeline-status";
  * links would be the wrong trade.
  */
 
+/*
+ * Icons are not decoration here. The admin area is a privileged surface, and a
+ * text-only link gave it exactly the same visual weight as the public one, so
+ * there was nothing to aim at and nothing marking the boundary. The shield is
+ * doing the same job it did before the shell existed.
+ */
 const NAV_ITEMS = [
-    { href: "/", label: "Detections", adminOnly: false },
-    { href: "/admin", label: "Admin", adminOnly: true },
+    { href: "/", label: "Detections", icon: ScanLine, adminOnly: false },
+    { href: "/admin", label: "Admin", icon: Shield, adminOnly: true },
 ] as const;
 
 /**
@@ -56,6 +62,7 @@ function NavLinks({ isLoggedIn }: { isLoggedIn: boolean }) {
         <nav aria-label="Main" className="flex items-center gap-1">
             {NAV_ITEMS.filter((item) => !item.adminOnly || isLoggedIn).map((item) => {
                 const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+                const Icon = item.icon;
 
                 return (
                     <Link
@@ -63,14 +70,17 @@ function NavLinks({ isLoggedIn }: { isLoggedIn: boolean }) {
                         href={item.href}
                         aria-current={isActive ? "page" : undefined}
                         className={cn(
-                            "px-2.5 py-1.5 text-sm rounded-md transition-colors",
+                            "inline-flex items-center gap-1.5 px-2.5 py-1.5 text-sm rounded-md transition-colors",
                             "focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
                             isActive
                                 ? "bg-secondary text-secondary-foreground font-medium"
                                 : "text-muted-foreground hover:text-foreground hover:bg-secondary/60",
                         )}
                     >
-                        {item.label}
+                        <Icon className="h-4 w-4" aria-hidden />
+                        {/* Label hides on the narrowest screens; the icon and
+                            the accessible name both survive. */}
+                        <span className="hidden sm:inline">{item.label}</span>
                     </Link>
                 );
             })}

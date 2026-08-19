@@ -2,9 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import dayjs from "dayjs";
+import { cn } from "@/lib/utils";
 
 type Range = "24h" | "7d" | "30d" | "90d" | "1y";
 
@@ -60,6 +60,16 @@ const ChartTooltip = ({ active, payload }: any) => {
     return null;
 };
 
+const RANGE_ORDER: Range[] = ["24h", "7d", "30d", "90d", "1y"];
+
+const RANGE_SHORT: Record<Range, string> = {
+    "24h": "24h",
+    "7d": "7d",
+    "30d": "30d",
+    "90d": "90d",
+    "1y": "1y",
+};
+
 const RANGE_LABELS: Record<Range, string> = {
     "24h": "Last 24 hours, hourly",
     "7d": "Last 7 days, daily",
@@ -101,15 +111,49 @@ export function DetectionsChart({ detectionsByHour, detectionsByDay }: Detection
                     <CardTitle>Detections over time</CardTitle>
                     <CardDescription>{RANGE_LABELS[range]}</CardDescription>
                 </div>
-                <Tabs value={range} onValueChange={(v) => setRange(v as Range)}>
-                    <TabsList>
-                        <TabsTrigger value="24h">24h</TabsTrigger>
-                        <TabsTrigger value="7d">7d</TabsTrigger>
-                        <TabsTrigger value="30d">30d</TabsTrigger>
-                        <TabsTrigger value="90d">90d</TabsTrigger>
-                        <TabsTrigger value="1y">1y</TabsTrigger>
-                    </TabsList>
-                </Tabs>
+                {/*
+                  * A segmented control, not tabs.
+                  *
+                  * This was built from Radix Tabs, but there is no TabsContent
+                  * anywhere — the buttons re-filter one chart that is always
+                  * visible. That gave every button role="tab" with aria-controls
+                  * pointing at a tabpanel that does not exist, so a screen
+                  * reader announced a tab list and then found nothing it
+                  * governed. It also left the list itself as the tab stop with
+                  * no focus style on it.
+                  *
+                  * Plain buttons with aria-pressed describe what these actually
+                  * are: five toggles over one view. Each is individually
+                  * focusable, so keyboard order is obvious, and they carry real
+                  * focus outlines rather than inheriting a stripped one.
+                  */}
+                <div
+                    role="group"
+                    aria-label="Time range"
+                    className="inline-flex items-center gap-0.5 rounded-lg bg-muted p-[3px]"
+                >
+                    {RANGE_ORDER.map((option) => {
+                        const isActive = range === option;
+
+                        return (
+                            <button
+                                key={option}
+                                type="button"
+                                aria-pressed={isActive}
+                                onClick={() => setRange(option)}
+                                className={cn(
+                                    "px-2.5 py-1 text-sm rounded-md transition-colors",
+                                    "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
+                                    isActive
+                                        ? "bg-background text-foreground shadow-sm font-medium"
+                                        : "text-muted-foreground hover:text-foreground",
+                                )}
+                            >
+                                {RANGE_SHORT[option]}
+                            </button>
+                        );
+                    })}
+                </div>
             </CardHeader>
             <CardContent className="space-y-5">
                 <div className="grid grid-cols-3 gap-4 sm:max-w-md">

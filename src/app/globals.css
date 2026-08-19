@@ -207,6 +207,20 @@
   }
 }
 
+@layer base {
+  /*
+   * Recharts marks its SVG surface tabindex="0", so the chart is a tab stop,
+   * but ships no focus style with it — a keyboard user tabs onto the chart and
+   * nothing on screen changes. Restored here rather than per chart, since it
+   * applies to every chart the library renders.
+   */
+  .recharts-surface:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+}
+
 @layer components {
   /*
    * A registration plate, rendered as the object rather than as a label.
