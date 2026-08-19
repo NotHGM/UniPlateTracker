@@ -3,40 +3,17 @@ import { NextResponse, NextRequest } from 'next/server';
 import pool from '@/lib/db';
 import { z } from 'zod';
 import type { PoolClient } from 'pg';
+import { FilterSchema, buildPlateQuery } from '@/lib/plate-filters';
 
-/**
- * Sortable columns, as an allow-list.
- *
- * A column name cannot be passed as a query parameter — it is part of the SQL
- * text, not a value — so the only safe way to accept one from the client is to
- * map an opaque key onto a literal defined here. Interpolating the request
- * value directly would be an injection point.
- *
- * Sorting has to happen in the database for a second reason. The client only
- * ever holds one page of a result set that is currently 4,279 rows, so sorting
- * what it has produces a confidently ordered page that is not the top of
- * anything — wrong in a way nobody notices.
+/*
+ * Filtering and sorting live in lib/plate-filters so that this route and the
+ * CSV export apply identical rules. An export that quietly filters differently
+ * from the table it was launched from produces a file that looks right and is
+ * wrong.
  */
-const SORT_COLUMNS = {
-    seen: "recent_capture_time",
-    plate: "plate_number",
-    make: "car_make",
-    year: "year_of_manufacture",
-    mot: "mot_status",
-    tax: "tax_status",
-} as const;
-
-const QuerySchema = z.object({
+const QuerySchema = FilterSchema.extend({
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(10),
-    search: z.string().optional(),
-    make: z.string().optional(),
-    color: z.string().optional(),
-    year: z.coerce.number().int().optional(),
-    tax: z.string().optional(),
-    mot: z.string().optional(),
-    sort: z.enum(Object.keys(SORT_COLUMNS) as [keyof typeof SORT_COLUMNS]).default("seen"),
-    dir: z.enum(["asc", "desc"]).default("desc"),
 });
 
 export async function GET(request: NextRequest) {
@@ -47,53 +24,15 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid query parameters' }, { status: 400 });
     }
 
-    const { page, limit, search, make, color, year, tax, mot, sort, dir } = validation.data;
+    const { page, limit, ...filters } = validation.data;
     const offset = (page - 1) * limit;
 
-    const conditions: string[] = [];
-    const queryParams: (string | number)[] = [];
+    const { whereClause, params: queryParams, orderBy } = buildPlateQuery(filters);
 
-    const addCondition = (field: string, value: string | number | undefined, operator = "=") => {
-        if (value !== undefined && value !== null && value !== '' && value !== 'all') {
-            queryParams.push(operator === 'ILIKE' ? `%${value}%` : value);
-            conditions.push(`${field} ${operator} $${queryParams.length}`);
-        }
-    };
-
-    if (search) {
-        queryParams.push(`%${search.toUpperCase().replace(/\s/g, '')}%`);
-        conditions.push(`UPPER(REPLACE(plate_number, ' ', '')) ILIKE $${queryParams.length}`);
-    }
-
-    addCondition('car_make', make);
-    addCondition('car_color', color);
-    addCondition('year_of_manufacture', year);
-    addCondition('tax_status', tax);
-    addCondition('mot_status', mot);
-
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
     let client: PoolClient | null = null;
     try {
         const dbClient: PoolClient = await pool.connect();
         client = dbClient;
-
-        /*
-         * Both halves of the ORDER BY come from validated enums rather than
-         * from the request text, so neither can carry arbitrary SQL.
-         *
-         * NULLS LAST matters here because most sortable columns are nullable:
-         * a vehicle the DVLA holds no record for has no make, MOT or tax
-         * status. Postgres sorts nulls first on DESC by default, which would
-         * open every descending sort with a screen of blanks.
-         *
-         * The id tiebreak keeps paging stable. Without it, rows sharing a
-         * value — every plate with the same make, say — can come back in a
-         * different order per query, so the same row appears on two pages or
-         * on neither.
-         */
-        const sortColumn = SORT_COLUMNS[sort];
-        const sortDirection = dir === "asc" ? "ASC" : "DESC";
-        const orderBy = `ORDER BY ${sortColumn} ${sortDirection} NULLS LAST, id DESC`;
 
         const dataQuery = `SELECT * FROM license_plates ${whereClause} ${orderBy} LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
         const dataResult = await dbClient.query(dataQuery, [...queryParams, limit, offset]);

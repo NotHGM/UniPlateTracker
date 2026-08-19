@@ -14,7 +14,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import useSWR from "swr";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
-import { ArrowDown, ArrowUp, ChevronsUpDown, ImageOff, RefreshCw, Search, VideoOff, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronsUpDown, Download, ImageOff, RefreshCw, Search, VideoOff, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PlateVideoPlayer } from "./plate-video-player";
 import { PlateCard } from "./plate-card";
@@ -361,6 +361,24 @@ export function PlatesTable({
                                     : `${formatNumber(pagination.totalRows)} results`}
                             </div>
                             <div className="flex items-center gap-2">
+                                {/*
+                                  * Exports the whole matching set, not the page
+                                  * on screen, so it carries the same query the
+                                  * table was built from. A plain link rather
+                                  * than a fetch, so the browser streams it
+                                  * straight to disk instead of buffering a
+                                  * potentially very large file in memory.
+                                  */}
+                                <Button variant="ghost" size="sm" asChild>
+                                    <a
+                                        href={`/api/plates/export?${searchParams.toString()}`}
+                                        download
+                                        title={`Download all ${formatNumber(pagination.totalRows)} matching detections as CSV`}
+                                    >
+                                        <Download className="h-4 w-4 mr-1.5" aria-hidden />
+                                        Export
+                                    </a>
+                                </Button>
                                 <Button onClick={handleClearFilters} variant="ghost" size="sm" disabled={activeFilterCount === 0}>
                                     Clear
                                 </Button>

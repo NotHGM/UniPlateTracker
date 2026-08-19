@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/mode-toggle";
 import { LogoutButton } from "@/components/admin/logout-button";
 import { useAdminSession } from "./use-admin-session";
+import { PipelineStatus } from "./pipeline-status";
 
 /**
  * The chrome that persists across every screen.
@@ -102,7 +103,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
                     <NavLinks isLoggedIn={isLoggedIn} />
 
-                    <div className="ml-auto flex items-center gap-1.5">
+                    <div className="ml-auto flex items-center gap-3">
+                        <PipelineStatus />
                         <ModeToggle />
                         {/*
                           * Nothing is rendered until the session is known. A
