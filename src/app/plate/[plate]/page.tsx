@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import dayjs from "dayjs";
-import { ArrowLeft, ImageOff } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { getPlateHistory } from "@/lib/data";
 import { PageHeader } from "@/components/shell/app-shell";
 import { PlateTag, StatusBadge } from "@/components/app/plate-format";
+import { PlateImage } from "@/components/app/plate-image";
 import { PlateVideoPlayer } from "@/components/app/plate-video-player";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -121,20 +122,13 @@ export default async function PlateDetailPage({ params }: { params: Promise<{ pl
                         <ul className="divide-y">
                             {sightings.map((sighting) => (
                                 <li key={sighting.id} className="flex items-center gap-3 p-3">
-                                    <div className="w-24 shrink-0 aspect-video rounded overflow-hidden bg-muted border">
-                                        {sighting.image_url ? (
-                                            // eslint-disable-next-line @next/next/no-img-element -- base64 data URI from the capture
-                                            <img
-                                                src={sighting.image_url}
-                                                alt={`Capture at ${dayjs(sighting.recent_capture_time).format("DD/MM/YYYY HH:mm")}`}
-                                                className="w-full h-full object-cover"
-                                            />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                                                <ImageOff className="h-4 w-4" aria-hidden />
-                                            </div>
-                                        )}
-                                    </div>
+                                    <PlateImage
+                                        imageUrl={sighting.image_url}
+                                        plateNumber={sighting.plate_number}
+                                        appRegion={appRegion}
+                                        capturedAt={sighting.recent_capture_time}
+                                        className="w-24 shrink-0"
+                                    />
 
                                     <div className="min-w-0 flex-1">
                                         <time

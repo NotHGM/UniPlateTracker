@@ -1,9 +1,9 @@
 "use client";
 
 import dayjs from "dayjs";
-import { ImageOff } from "lucide-react";
 import { LicensePlate } from "@/lib/types";
 import { PlateLink, StatusBadge } from "./plate-format";
+import { PlateImage } from "./plate-image";
 import { PlateVideoPlayer } from "./plate-video-player";
 
 /**
@@ -47,21 +47,13 @@ export function PlateCard({
     return (
         <li className="border-b last:border-b-0 p-3">
             <div className="flex gap-3">
-                <div className="w-24 shrink-0 aspect-video rounded-md overflow-hidden bg-muted border">
-                    {plate.image_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element -- base64 data URI from the capture, not a remote asset
-                        <img
-                            src={plate.image_url}
-                            alt={`Capture of ${plate.plate_number}`}
-                            className="w-full h-full object-cover"
-                        />
-                    ) : (
-                        <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                            <ImageOff className="h-4 w-4" aria-hidden />
-                            <span className="sr-only">No capture image</span>
-                        </div>
-                    )}
-                </div>
+                <PlateImage
+                    imageUrl={plate.image_url}
+                    plateNumber={plate.plate_number}
+                    appRegion={appRegion}
+                    capturedAt={plate.recent_capture_time}
+                    className="w-24 shrink-0"
+                />
 
                 <div className="min-w-0 flex-1 space-y-1.5">
                     <div className="flex items-start justify-between gap-2">

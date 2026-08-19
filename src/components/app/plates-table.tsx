@@ -14,11 +14,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import useSWR from "swr";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
-import { ArrowDown, ArrowUp, ChevronsUpDown, Download, ImageOff, RefreshCw, Search, VideoOff, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronsUpDown, Download, RefreshCw, Search, VideoOff, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PlateVideoPlayer } from "./plate-video-player";
 import { PlateCard } from "./plate-card";
 import { PlateLink, StatusBadge } from "./plate-format";
+import { PlateImage } from "./plate-image";
 
 dayjs.extend(relativeTime);
 
@@ -482,19 +483,13 @@ export function PlatesTable({
                             plates.map((plate) => (
                                     <TableRow key={plate.id}>
                                         <TableCell className="pl-4 py-1.5">
-                                            <div className="w-20 aspect-video rounded overflow-hidden bg-muted border">
-                                                {plate.image_url ? (
-                                                    <img
-                                                        src={plate.image_url}
-                                                        alt={`Capture of ${plate.plate_number}`}
-                                                        className="w-full h-full object-cover"
-                                                    />
-                                                ) : (
-                                                    <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                                                        <ImageOff className="h-4 w-4" />
-                                                    </div>
-                                                )}
-                                            </div>
+                                            <PlateImage
+                                                imageUrl={plate.image_url}
+                                                plateNumber={plate.plate_number}
+                                                appRegion={appRegion}
+                                                capturedAt={plate.recent_capture_time}
+                                                className="w-20"
+                                            />
                                         </TableCell>
                                         <TableCell className="align-middle">
                                             <PlateLink plateNumber={plate.plate_number} appRegion={appRegion} />
