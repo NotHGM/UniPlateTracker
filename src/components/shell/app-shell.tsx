@@ -128,6 +128,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </header>
 
             <main className="flex-1 mx-auto w-full max-w-[1600px] px-4 sm:px-6 py-6">{children}</main>
+
+            {/*
+              * The version is here because this is self-hosted software that
+              * people upgrade by hand. "What are you running?" is the first
+              * question in any support thread, and until now the only way to
+              * answer it was to go and read package.json on the server.
+              */}
+            <footer className="mx-auto w-full max-w-[1600px] px-4 sm:px-6 py-4 text-xs text-muted-foreground">
+                UniPlateTracker{" "}
+                <span className="tabular-nums">v{process.env.NEXT_PUBLIC_APP_VERSION}</span>
+            </footer>
         </div>
     );
 }

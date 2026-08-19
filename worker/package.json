@@ -1,6 +1,6 @@
 {
   "name": "worker",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Background service for UniPlateTracker to process UniFi Protect webhooks.",
   "main": "dist/index.js",
   "scripts": {
