@@ -53,9 +53,12 @@ pnpm-debug.log*
 .vscode/*
 !/.vscode/settings.json
 !/.vscode/extensions.json
-# Claude Code (local agent state)
+# Agent instruction files. Next 16 regenerates both of these on every dev
+# start and build (see agentRules in next.config), so they are build output
+# rather than source.
 .claude/
 CLAUDE.md
+AGENTS.md
 
 # --- OS & Miscellaneous ---
 # macOS
