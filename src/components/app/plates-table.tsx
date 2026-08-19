@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { PlatesApiResponse } from "@/lib/types";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,15 +9,15 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
 import { DataPagination } from "./data-pagination";
 import { motion, AnimatePresence } from "framer-motion";
 import useSWR from "swr";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
-import styles from "./plates.module.css";
 import { ImageOff, RefreshCw, Search, VideoOff, X } from "lucide-react";
 import { PlateVideoPlayer } from "./plate-video-player";
+import { PlateCard } from "./plate-card";
+import { PlateTag, StatusBadge } from "./plate-format";
 
 dayjs.extend(relativeTime);
 
@@ -30,39 +30,6 @@ interface PlatesTableProps {
     internationalApiEnabled: boolean;
     videoCaptureEnabled: boolean;
 }
-
-const formatPlate = (plate: string | null): React.ReactNode => {
-    if (!plate) return <>{"N/A"}</>;
-    plate = plate.replace(/\s/g, "");
-    if (plate.length >= 7) {
-        return (
-            <>
-                <span>{plate.substring(0, 4)}</span>
-                <span style={{ display: "inline-block", width: "0.25em" }} />
-                <span>{plate.substring(4)}</span>
-            </>
-        );
-    }
-    if (plate.length === 6) {
-        return (
-            <>
-                <span>{plate.substring(0, 3)}</span>
-                <span style={{ display: "inline-block", width: "0.25em" }} />
-                <span>{plate.substring(3)}</span>
-            </>
-        );
-    }
-    return <span>{plate}</span>;
-};
-
-const getStatusClass = (status: string | null): string => {
-    if (!status) return styles.badgeSecondary;
-    const lower = status.toLowerCase();
-    if (lower === "valid" || lower === "taxed") return styles.badgeSuccess;
-    if (lower.includes("expire") || lower.includes("due") || lower.includes("not taxed")) return styles.badgeDestructive;
-    if (lower.includes("sorn") || lower.includes("untaxed")) return styles.badgeWarning;
-    return styles.badgeSecondary;
-};
 
 const formatNumber = (n: number) => new Intl.NumberFormat("en-GB").format(n);
 
@@ -308,7 +275,29 @@ export function PlatesTable({
                 )}
             </AnimatePresence>
 
-            <div className="rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden">
+            {/*
+              * Below md the table becomes a card list rather than a scrolling
+              * table. See plate-card.tsx for why reflowing beats scrolling here.
+              */}
+            <div className="md:hidden rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden">
+                {plates.length > 0 ? (
+                    <ul className="divide-y">
+                        {plates.map((plate) => (
+                            <PlateCard
+                                key={plate.id}
+                                plate={plate}
+                                appRegion={appRegion}
+                                showVehicleDetails={showVehicleDetails}
+                                videoCaptureEnabled={videoCaptureEnabled}
+                            />
+                        ))}
+                    </ul>
+                ) : (
+                    <p className="p-6 text-center text-sm text-muted-foreground">No results found.</p>
+                )}
+            </div>
+
+            <div className="hidden md:block rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden">
                 <Table>
                     <TableHeader>
                         <TableRow>
@@ -351,9 +340,7 @@ export function PlatesTable({
                                             </div>
                                         </TableCell>
                                         <TableCell className="align-middle">
-                                            <div className={appRegion === "UK" ? styles.ukPlateStyle : styles.intlPlateStyle}>
-                                                {formatPlate(plate.plate_number)}
-                                            </div>
+                                            <PlateTag plateNumber={plate.plate_number} appRegion={appRegion} />
                                         </TableCell>
                                         {showVehicleDetails && (
                                             <>
@@ -364,9 +351,7 @@ export function PlatesTable({
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="align-middle">
-                                                    <div className={cn(styles.badge, getStatusClass(plate.mot_status))}>
-                                                        {plate.mot_status || "N/A"}
-                                                    </div>
+                                                    <StatusBadge status={plate.mot_status} />
                                                     {plate.mot_expiry_date && (
                                                         <div className="text-xs text-muted-foreground mt-1">
                                                             Expires {dayjs(plate.mot_expiry_date).format("DD/MM/YYYY")}
@@ -374,9 +359,7 @@ export function PlatesTable({
                                                     )}
                                                 </TableCell>
                                                 <TableCell className="align-middle">
-                                                    <div className={cn(styles.badge, getStatusClass(plate.tax_status))}>
-                                                        {plate.tax_status || "N/A"}
-                                                    </div>
+                                                    <StatusBadge status={plate.tax_status} />
                                                     {plate.tax_due_date && (
                                                         <div className="text-xs text-muted-foreground mt-1">
                                                             Due {dayjs(plate.tax_due_date).format("DD/MM/YYYY")}
