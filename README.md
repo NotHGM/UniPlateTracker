@@ -4,6 +4,27 @@
 
 Events are received in real-time from your UniFi NVR via webhooks. The application can enrich license plates with official data (for UK users via the DVLA) and can automatically capture a short, time-accurate video clip of each detection. All data, including thumbnails and video files, is stored on your private server and managed by your own PostgreSQL database.
 
+## 🔎 Live Demo
+
+**[uniplatetracker-demo.hgm.gg](https://uniplatetracker-demo.hgm.gg)** — sign in with `demo@hgm.gg` / `demo1234`.
+
+The admin dashboard is the half of this application that a screenshot cannot
+show you, so the demo publishes its own credentials rather than hiding it. It
+is read-only: adding and revoking admins is refused, and the data is wiped and
+regenerated every night.
+
+Every detection there is invented. The registrations all begin with `Z`, which
+the DVLA has never issued as the first letter of a memory tag, so none of them
+can belong to a real vehicle, and no camera, NVR or DVLA lookup is involved at
+any point.
+
+If you want to run something similar yourself, see `DEMO_MODE` in
+`.env.example` and `npm run db:seed-demo`. Do not set that flag on an
+installation holding real detections; it stops a demo being vandalised, it does
+not make a deployment safe to expose.
+
+---
+
 ## ✨ Key Features
 
 -   **Real-Time Event Processing:** Instantly receives and processes license plate detections via UniFi Protect webhooks.
