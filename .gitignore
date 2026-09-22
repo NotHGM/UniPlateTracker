@@ -75,3 +75,5 @@ AGENTS.md
 # --- Temporary Video Segments ---
 # Ignore the temporary video segments created by the video capture worker
 /worker/temp_segments/
+# Helm agent workspace (uploads/screenshots, board state)
+.helm/
