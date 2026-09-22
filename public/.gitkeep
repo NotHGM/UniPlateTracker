@@ -1,0 +1,10 @@
+This directory is intentionally kept even though it is empty.
+
+The Dockerfile copies /app/public into the runtime image, and that COPY fails
+outright if the directory does not exist. It was removed along with the rest
+of the create-next-app leftovers, which quietly broke `docker compose build`
+for anyone following the Docker install path in the README.
+
+Keeping the directory is the lower-surprise fix: the day someone adds a
+favicon or a robots.txt it will simply work, rather than being silently
+dropped from the image.

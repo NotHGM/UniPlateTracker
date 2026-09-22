@@ -5,6 +5,7 @@ import { getIronSession } from 'iron-session';
 import { cookies } from 'next/headers';
 import { sessionOptions, SessionData } from '@/lib/session';
 import { AdminEmailSchema, isSameOriginRequest } from '@/lib/security';
+import { demoWriteBlockedResponse, isDemoMode } from '@/lib/demo';
 
 export async function GET() {
     // @ts-ignore
@@ -32,6 +33,16 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+    /*
+     * Refused before anything else, including the session lookup. The demo
+     * publishes its admin password, so "is this caller signed in" is not a
+     * meaningful gate here and checking it first would only make the refusal
+     * slower to arrive.
+     */
+    if (isDemoMode()) {
+        return demoWriteBlockedResponse();
+    }
+
     if (!isSameOriginRequest(req)) {
         return NextResponse.json({ error: 'Invalid request origin.' }, { status: 403 });
     }
@@ -76,6 +87,16 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+    /*
+     * Refused before anything else, including the session lookup. The demo
+     * publishes its admin password, so "is this caller signed in" is not a
+     * meaningful gate here and checking it first would only make the refusal
+     * slower to arrive.
+     */
+    if (isDemoMode()) {
+        return demoWriteBlockedResponse();
+    }
+
     if (!isSameOriginRequest(req)) {
         return NextResponse.json({ error: 'Invalid request origin.' }, { status: 403 });
     }

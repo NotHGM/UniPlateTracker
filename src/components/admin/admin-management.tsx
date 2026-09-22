@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { UserPlus, Trash2, ShieldOff, Loader2, Crown } from "lucide-react";
+import { UserPlus, Trash2, ShieldOff, Loader2, Crown, FlaskConical } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Toaster, toast } from "sonner";
 
 interface AdminUser {
@@ -25,7 +26,19 @@ interface AdminData {
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
-export function AdminManagement({ currentUserEmail }: { currentUserEmail: string }) {
+/*
+ * isDemo is passed in rather than read from the environment, because this is
+ * a client component and DEMO_MODE only exists on the server. Deliberately
+ * not imported from lib/demo either: that module pulls in NextResponse, which
+ * has no business in a browser bundle.
+ */
+export function AdminManagement({
+    currentUserEmail,
+    isDemo = false,
+}: {
+    currentUserEmail: string;
+    isDemo?: boolean;
+}) {
     const { data, error, mutate, isLoading } = useSWR<AdminData>("/api/admin/management", fetcher);
     const { admins, initialAdminEmail } = data || { admins: [], initialAdminEmail: null };
 
@@ -82,6 +95,24 @@ export function AdminManagement({ currentUserEmail }: { currentUserEmail: string
                 <CardDescription>Add, view and revoke admin user access.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+                {/*
+                  * On the demo the form is replaced outright rather than
+                  * disabled in place. A greyed-out field still reads as "you
+                  * could do this if you were signed in properly", which is the
+                  * wrong impression: the visitor IS signed in, and the answer
+                  * is simply no. Saying so is clearer than a dead control.
+                  */}
+                {isDemo ? (
+                    <Alert>
+                        <FlaskConical className="h-4 w-4" aria-hidden />
+                        <AlertTitle>Read-only demo</AlertTitle>
+                        <AlertDescription>
+                            Adding and revoking admins is disabled here, since the sign-in details for this demo
+                            are public. Everything else on this dashboard behaves exactly as it does in a real
+                            deployment.
+                        </AlertDescription>
+                    </Alert>
+                ) : (
                 <form onSubmit={handleAddAdmin} className="flex flex-col sm:flex-row gap-2">
                     {/*
                       * A real label, not just a placeholder. The placeholder
@@ -107,6 +138,7 @@ export function AdminManagement({ currentUserEmail }: { currentUserEmail: string
                         Add admin
                     </Button>
                 </form>
+                )}
 
                 <div className="border rounded-md overflow-hidden">
                     <Table>
@@ -139,7 +171,9 @@ export function AdminManagement({ currentUserEmail }: { currentUserEmail: string
 
                                 let canRevoke = true;
                                 let disabledTitle = "Revoke access";
-                                if (admin.email === currentUserEmail) {
+                                if (isDemo) {
+                                    canRevoke = false; disabledTitle = "Disabled in the demo.";
+                                } else if (admin.email === currentUserEmail) {
                                     canRevoke = false; disabledTitle = "You cannot revoke yourself.";
                                 } else if (isTargetInitialAdmin) {
                                     canRevoke = false; disabledTitle = "The initial admin cannot be revoked.";

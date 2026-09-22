@@ -6,10 +6,24 @@ import { getIronSession } from 'iron-session';
 import { cookies } from 'next/headers';
 import { sessionOptions, SessionData } from '@/lib/session';
 import { isSameOriginRequest, AdminEmailSchema } from '@/lib/security';
+import { demoWriteBlockedResponse, isDemoMode } from '@/lib/demo';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
+    /*
+     * Signup is closed on the demo, and this route in particular has to be,
+     * because of the bootstrap path further down: when approved_emails is
+     * empty the first caller to arrive is allowed to create an account and is
+     * then approved automatically. That is correct for a fresh private
+     * install and catastrophic for a public URL, so the demo must never reach
+     * it. The seed script also keeps approved_emails populated for the same
+     * reason, belt and braces.
+     */
+    if (isDemoMode()) {
+        return demoWriteBlockedResponse();
+    }
+
     if (!isSameOriginRequest(req)) {
         return NextResponse.json({ message: 'Invalid request origin.' }, { status: 403 });
     }

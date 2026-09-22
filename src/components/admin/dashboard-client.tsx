@@ -40,9 +40,17 @@ function describeToday(today: number, yesterday: number | undefined): string | u
 export function DashboardClient({
     stats,
     currentUserEmail,
+    isDemo = false,
 }: {
     stats: AdminStats | null;
     currentUserEmail: string;
+    /*
+     * Threaded down from the page rather than read here, because this is a
+     * client component and DEMO_MODE is a server-side environment variable.
+     * The management card needs it to stop offering controls the API will
+     * refuse.
+     */
+    isDemo?: boolean;
 }) {
     const { data } = useSWR("/api/admin/management", (url) => fetch(url).then((res) => res.json()));
 
@@ -125,7 +133,7 @@ export function DashboardClient({
               * revoked account was revoked by someone who should have.
               */}
             <div className="grid gap-4 xl:grid-cols-2 items-start">
-                <AdminManagement currentUserEmail={currentUserEmail} />
+                <AdminManagement currentUserEmail={currentUserEmail} isDemo={isDemo} />
                 {amIInitialAdmin && <AdminActivityLog />}
             </div>
         </div>

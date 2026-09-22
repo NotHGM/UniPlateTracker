@@ -16,7 +16,8 @@
     "start:worker": "npm run start --prefix worker",
     "start:buffer": "node worker/dist/buffer-manager.js",
     "lint": "next lint",
-    "db:init": "tsx scripts/init-db.ts"
+    "db:init": "tsx scripts/init-db.ts",
+    "db:seed-demo": "tsx scripts/seed-demo.ts"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.15",

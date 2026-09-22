@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogIn, ScanLine, Shield } from "lucide-react";
+import { FlaskConical, LogIn, ScanLine, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/mode-toggle";
@@ -88,7 +88,30 @@ function NavLinks({ isLoggedIn }: { isLoggedIn: boolean }) {
     );
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+/**
+ * Says, once, that this is a demo.
+ *
+ * A public demo that looks exactly like the real thing is a trap: someone
+ * lands on a surveillance dashboard full of plausible registration numbers
+ * and has no way to know whether they are looking at a real driveway. The
+ * strip is quiet enough to ignore on the second screen and impossible to miss
+ * on the first, which is the right balance for a sentence nobody needs twice.
+ */
+function DemoBanner() {
+    return (
+        <div className="border-b bg-warning/10 text-foreground">
+            <div className="mx-auto max-w-[1600px] px-4 sm:px-6 py-2 flex items-center gap-2 text-xs sm:text-sm">
+                <FlaskConical className="h-4 w-4 shrink-0 text-warning" aria-hidden />
+                <p>
+                    <span className="font-medium">Public demo.</span> Every detection below is generated test
+                    data, refreshed daily. No real vehicle, camera or DVLA record is involved.
+                </p>
+            </div>
+        </div>
+    );
+}
+
+export function AppShell({ children, isDemo = false }: { children: React.ReactNode; isDemo?: boolean }) {
     const pathname = usePathname();
     const { isLoggedIn, isLoading } = useAdminSession();
 
@@ -105,6 +128,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
     return (
         <div className="bg-background min-h-screen flex flex-col">
+            {isDemo && <DemoBanner />}
             <header className="sticky top-0 z-40 border-b bg-background/85 backdrop-blur-sm supports-[backdrop-filter]:bg-background/70">
                 <div className="mx-auto max-w-[1600px] px-4 sm:px-6 h-14 flex items-center gap-4">
                     <Wordmark />

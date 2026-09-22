@@ -1,102 +1,13 @@
-"use client";
+import { AuthForm } from "@/components/admin/auth-form";
+import { getDemoCredentials } from "@/lib/demo";
 
-import { useState } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2 } from "lucide-react";
+/*
+ * A server component purely so DEMO_MODE is read from the running process
+ * rather than from the build. The form itself is a client component; see
+ * components/admin/auth-form.tsx.
+ */
+export const dynamic = "force-dynamic";
 
 export default function AuthPage() {
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [message, setMessage] = useState({ type: "", text: "" });
-    const [isLoading, setIsLoading] = useState(false);
-
-    const handleAuth = async (action: "login" | "signup") => {
-        setIsLoading(true);
-        setMessage({ type: "", text: "" });
-
-        try {
-            const response = await fetch(`/api/admin/auth/${action}`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, password }),
-            });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.message || "An unknown server error occurred.");
-
-            setMessage({ type: "success", text: data.message });
-            window.location.assign("/admin");
-        } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
-            setMessage({ type: "error", text: errorMessage });
-            setIsLoading(false);
-        }
-    };
-
-    return (
-        <div className="flex items-center justify-center min-h-screen bg-muted/40 p-4">
-            <Tabs defaultValue="login" className="w-full max-w-[400px]">
-                <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="login">Login</TabsTrigger>
-                    <TabsTrigger value="signup">Sign up</TabsTrigger>
-                </TabsList>
-
-                <Card className="mt-4">
-                    <CardHeader className="text-center">
-                        <CardTitle className="text-2xl">UniPlateTracker admin</CardTitle>
-                        <CardDescription>Sign in or create your admin account.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        {message.text && (
-                            <Alert
-                                variant={message.type === "success" ? "default" : "destructive"}
-                                className={message.type === "success" ? "bg-success/10 border-success/40 text-success" : ""}
-                            >
-                                <AlertTitle>{message.type === "success" ? "Success" : "Error"}</AlertTitle>
-                                <AlertDescription>{message.text}</AlertDescription>
-                            </Alert>
-                        )}
-                        <div className="space-y-2">
-                            <Input
-                                id="email"
-                                type="email"
-                                placeholder="admin@example.com"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                disabled={isLoading}
-                                autoComplete="email"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Input
-                                id="password"
-                                type="password"
-                                placeholder="••••••••••"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                disabled={isLoading}
-                                autoComplete="current-password"
-                            />
-                        </div>
-
-                        <TabsContent value="login" className="space-y-0">
-                            <Button onClick={() => handleAuth("login")} disabled={isLoading} className="w-full">
-                                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Login
-                            </Button>
-                        </TabsContent>
-                        <TabsContent value="signup" className="space-y-0">
-                            <Button onClick={() => handleAuth("signup")} disabled={isLoading} className="w-full">
-                                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Sign up
-                            </Button>
-                        </TabsContent>
-                    </CardContent>
-                </Card>
-            </Tabs>
-        </div>
-    );
+    return <AuthForm demoCredentials={getDemoCredentials()} />;
 }
