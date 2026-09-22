@@ -6,6 +6,7 @@ import { DashboardClient } from "@/components/admin/dashboard-client";
 import { PageHeader } from "@/components/shell/app-shell";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { getAdminStats } from "@/lib/data";
+import { isDemoMode } from "@/lib/demo";
 
 export default async function AdminDashboardPage() {
     // @ts-ignore
@@ -29,7 +30,7 @@ export default async function AdminDashboardPage() {
                     <AlertDescription>{error}</AlertDescription>
                 </Alert>
             ) : (
-                <DashboardClient stats={data} currentUserEmail={session.user.email} />
+                <DashboardClient stats={data} currentUserEmail={session.user.email} isDemo={isDemoMode()} />
             )}
         </>
     );
